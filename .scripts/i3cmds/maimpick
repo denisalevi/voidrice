@@ -1,6 +1,20 @@
 #!/bin/sh
 rootdir=~/pictures/screenshots
-selection="$(printf "a selected area\\ncurrent window\\nfull screen\\ndigital paper\\ndigital paper (pdf)\\na selected area (copy)\\ncurrent window (copy)\\nfull screen (copy)\\ndigital paper (copy)" | dmenu -l 6 -i -p "Screenshot which area?")"
+selection="$(printf "a selected area
+current window
+full screen
+digital paper
+digital paper (pdf)
+a selected area (copy)
+current window (copy)
+full screen (copy)
+digital paper (copy)
+digital paper (select area)" \
+    | dmenu -l 6 -i -p "Screenshot which area?")"
+
+function dptrp1_screenshot () {
+    dptrp1 --addr digitalpaper.local screenshot $1
+}
 
 case $selection in
 	"a selected area")
@@ -17,11 +31,11 @@ case $selection in
         ;;
     "digital paper")
         filepath="$rootdir/dptrp1-$(date '+%y%m%d-%H%M-%S').png"
-        dptrp1 screenshot "$filepath"
+        dptrp1_screenshot "$filepath"
         ;;
     "digital paper (pdf)")
         filepath="$rootdir/dptrp1.pdf"
-        dptrp1 screenshot "$rootdir/dptrp1.png" && convert "$rootdir/dptrp1.png" $filepath
+        dptrp1_screenshot "$rootdir/dptrp1.png" && convert "$rootdir/dptrp1.png" $filepath
         ;;
 	"a selected area (copy)")
         maim -s | xclip -selection clipboard -t image/png
@@ -33,12 +47,41 @@ case $selection in
         maim | xclip -selection clipboard -t image/png
         ;;
     "digital paper (copy)")
-        dptrp1 screenshot /tmp/dptrp1-screenshot.png && xclip -selection clipboard -t image/png -i /tmp/dptrp1-screenshot.png
+        dptrp1_screenshot /tmp/dptrp1-screenshot.png
+        if [ $? = 0 ]
+        then
+            sxiv -f /tmp/dptrp1-screenshot.png &
+            PROC_ID="$!"
+            maim -s | xclip -selection clipboard -t image/png
+            kill $PROC_ID
+        fi
+        dptrp1_screenshot /tmp/dptrp1-screenshot.png \
+            && xclip -selection clipboard -t image/png -i /tmp/dptrp1-screenshot.png
+        ;;
+    "digital paper (select area)")
+        filepath="$rootdir/dptrp1-selected-$(date '+%y%m%d-%H%M-%S').png"
+        maim -s "$filepath"
+        dptrp1_screenshot /tmp/dptrp1-screenshot.png
+        if [ $? = 0 ]
+        then
+            sxiv -f /tmp/dptrp1-screenshot.png &
+            PROC_ID="$!"
+            maim -s "$filepath"
+            kill $PROC_ID
+        fi
         ;;
 esac
 
-if [ -n "$filepath" ]
+retvar=$?
+if [ $retvar != 0 ]
 then
+    DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+    msg="ERROR: $0 screenshot command failed with return code $retvar."
+    notify-send "$msg"
+    exit 1
+fi
+
+if [ -n "$filepath" ]; then
     filename=$(basename -- "$filepath")
     extension="${filename##*.}"
 
@@ -48,7 +91,8 @@ then
     new_filename="$(printf "timestemp" | dmenu -l 1 -p "Screenshot file name?")"
     if [ "$new_filename" = "timestemp" ]
     then
-        new_filepath=$filepath
+        # means the default $filepath is used
+        unset new_filename
     fi
 
     if [ -n "$new_filename" ]
@@ -79,6 +123,4 @@ then
             echo "$relpath" | xclip && notify-send "Copied $relpath to clipboard"
             ;;
     esac
-
-
 fi

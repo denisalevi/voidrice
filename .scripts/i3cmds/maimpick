@@ -1,9 +1,84 @@
 #!/bin/sh
-case "$(printf "a selected area\\ncurrent window\\nfull screen\\na selected area (copy)\\ncurrent window (copy)\\nfull screen (copy)" | dmenu -l 6 -i -p "Screenshot which area?")" in
-	"a selected area") maim -s pic-selected-"$(date '+%y%m%d-%H%M-%S').png" ;;
-	"current window") maim -i "$(xdotool getactivewindow)" pic-window-"$(date '+%y%m%d-%H%M-%S').png" ;;
-	"full screen") maim pic-full-"$(date '+%y%m%d-%H%M-%S').png" ;;
-	"a selected area (copy)") maim -s | xclip -selection clipboard -t image/png ;;
-	"current window (copy)") maim -i "$(xdotool getactivewindow)" | xclip -selection clipboard -t image/png ;;
-	"full screen (copy)") maim | xclip -selection clipboard -t image/png ;;
+rootdir=~/pictures/screenshots
+selection="$(printf "a selected area\\ncurrent window\\nfull screen\\ndigital paper\\ndigital paper (pdf)\\na selected area (copy)\\ncurrent window (copy)\\nfull screen (copy)\\ndigital paper (copy)" | dmenu -l 6 -i -p "Screenshot which area?")"
+
+case $selection in
+	"a selected area")
+        filepath="$rootdir/pic-selected-$(date '+%y%m%d-%H%M-%S').png"
+        maim -s "$filepath"
+        ;;
+	"current window")
+        filepath="$rootdir/pic-window-$(date '+%y%m%d-%H%M-%S').png"
+        maim -i "$(xdotool getactivewindow)" "$filepath"
+        ;;
+	"full screen")
+        filepath="$rootdir/pic-full-$(date '+%y%m%d-%H%M-%S').png"
+        maim "$filepath"
+        ;;
+    "digital paper")
+        filepath="$rootdir/dptrp1-$(date '+%y%m%d-%H%M-%S').png"
+        dptrp1 screenshot "$filepath"
+        ;;
+    "digital paper (pdf)")
+        filepath="$rootdir/dptrp1.pdf"
+        dptrp1 screenshot "$rootdir/dptrp1.png" && convert "$rootdir/dptrp1.png" $filepath
+        ;;
+	"a selected area (copy)")
+        maim -s | xclip -selection clipboard -t image/png
+        ;;
+	"current window (copy)")
+        maim -i "$(xdotool getactivewindow)" | xclip -selection clipboard -t image/png
+        ;;
+	"full screen (copy)")
+        maim | xclip -selection clipboard -t image/png
+        ;;
+    "digital paper (copy)")
+        dptrp1 screenshot /tmp/dptrp1-screenshot.png && xclip -selection clipboard -t image/png -i /tmp/dptrp1-screenshot.png
+        ;;
 esac
+
+if [ -n "$filepath" ]
+then
+    filename=$(basename -- "$filepath")
+    extension="${filename##*.}"
+
+    # XXX: check ~/.config/sxiv/exec/key-handler for how to pass directories from bmdirs
+    new_rootdir="$(printf "~/pictures/screenshots\\n~/documents/notes/vim-notes/.images\\n~/documents/notes/vimwiki/images" | dmenu -l 3 -p "Screenshot where to save?" | sed "s|~|$HOME|g")"
+
+    new_filename="$(printf "timestemp" | dmenu -l 1 -p "Screenshot file name?")"
+    if [ "$new_filename" = "timestemp" ]
+    then
+        new_filepath=$filepath
+    fi
+
+    if [ -n "$new_filename" ]
+    then
+        new_extension="${new_filename##*.}"
+        if [ "$new_extension" = "$extension" ]
+        then
+            # extension was given in new filename, don't append it again
+            full_filename=$new_filename
+        else
+            full_filename=$new_filename.$extension
+        fi
+
+        new_filepath=$new_rootdir/$full_filename
+        mv "$filepath" "$new_filepath" && notify-send -i "$(readlink -f "$filepath")" "Screenshot saved as $new_filepath"
+    else
+        notify-send -i "$(readlink -f "$filepath")" "Screenshot saved as $filepath"
+    fi
+
+    # copy relative path from vim-notes or vimwiki to clipboard
+    case $new_rootdir in
+        "$HOME/documents/notes/vim-notes/.images")
+            relpath="./.images/$full_filename"
+            xclip -selection clipboard "$relpath" && notify-send "Copied $relpath to clipboard"
+            ;;
+        "$HOME/documents/notes/vimwiki/images")
+            relpath="images/$full_filename"
+            echo "$relpath" | xclip && notify-send "Copied $relpath to clipboard"
+            ;;
+    esac
+
+
+fi

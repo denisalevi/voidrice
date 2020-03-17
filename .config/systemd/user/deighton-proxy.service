@@ -1,0 +1,14 @@
+# Adapted from arch wiki: https://wiki.archlinux.org/index.php/OpenSSH#Autossh_-_automatically_restarts_SSH_sessions_and_tunnels
+
+[Unit]
+Description=AutoSSH service (starts at boot)
+After=network.target
+
+[Service]
+Environment="AUTOSSH_GATETIME=0"
+ExecStart=/usr/bin/autossh -M 0 -o "ServerAliveInterval 45" -o "ServerAliveCountMax 2" -NTD 3125 denis@deighton.bccn-berlin.de
+# could add -C: compression (shown in arch wiki for SOCKS proxy)
+# added -T: disable pseudo-terminal alocation
+
+[Install]
+WantedBy=multi-user.target

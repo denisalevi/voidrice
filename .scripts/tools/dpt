@@ -1,0 +1,270 @@
+#!/bin/bash
+
+USAGE="
+Usage:
+    dpt -h            Display this help message.
+    dpt upload        Upload document to digital paper.
+    dpt download      Download document from digital paper.
+
+    dpt {upload|download} [options] file1.pdf file2.pdf ...
+        options:
+            -f    Folder on digital paper: Document/<folder>
+                  (default: Document/Received)
+            -s    Name suffix for uploaded/downloaded file.
+                  (turns file.pdf into file<suffix>.pdf)
+"
+
+IFS='
+'
+#set -f
+dp_folder="Received"
+suffix=""
+
+# get action (upload/download)
+action=$1
+
+# process action
+case "$action" in
+    -h)
+        echo "$USAGE"
+        exit 0
+        ;;
+    upload|download)
+        shift  # remove `upload/download` from argument list
+        ;;
+    *)
+        if [ "$action" = "" ]; then
+            echo "No dpt command given."
+        else
+            echo "Invalid command: $action"
+        fi
+        echo "$USAGE"
+        exit 1
+esac
+
+
+FILES=()
+# see code-snippet notes
+# do the following as long as there are arguments in $@
+while [ $# -gt 0 ]
+do
+    # these are set by getopts
+    unset OPTIND
+    unset OPTARG
+    # loop through args, collect keyword args, stops at first posisitonal arg
+    while getopts ":hf:s:" flag;
+    do
+        case "$flag" in
+            h)
+                echo "$USAGE"
+                exit 0
+                ;;
+            f)
+                # overwrite default folder if given
+                dp_folder="$OPTARG"
+                dp_folders=$(dptrp1 --addr digitalpaper.local list-folders)
+                exists=0
+                for folder in $dp_folders; do
+                    if [ "$dp_folder" = "$folder" ]; then
+                        exists=1
+                        break
+                    fi
+                done
+                if [ $exists -eq 0 ]; then
+                    echo "Folder $dp_folder does not exists on digital paper."
+                    echo "Folders on digital paper are:"
+                    for folder in $dp_folders; do
+                        echo "      $folder"
+                    done
+                fi
+                exit 1
+                ;;
+            s)
+                # name suffix for uploaded / downloaded file
+                suffix="$OPTARG"
+                ;;
+            \?)
+                echo "Invalid option: $OPTARG" 1>&2
+                exit 1
+                ;;
+            :)
+                echo "Invalid option: $OPTARG requires an argument" 1>&2
+                exit 1
+                ;;
+        esac
+    done
+    # shift by the number of collected keyward args
+    shift $((OPTIND-1))
+    # $1 now is the first positional arg, collect it
+    FILES+=("$1")
+    # consume $1 by shift
+    shift
+done
+
+
+function dpt-upload() {
+
+    dp_files=$(dptrp1 --addr digitalpaper.local list-documents \
+        | awk -F / '/Document\/'"$dp_folder"'/ {print $3}')
+
+    for source_file in "${FILES[@]}"
+    do
+        target_file="${source_file%.*}$suffix.pdf"
+        if [ $target_file = $source_file ];
+        then
+            echo "Uploading $source_file"
+        else
+            echo "Uploading $source_file as $target_file"
+        fi
+
+        ul=1  # upload boolean (default yes)
+        exists=0
+        for df in $dp_files; do
+            if [ "$df" = "$target_file" ]; then
+                exists=1
+                break
+            fi
+        done
+
+        # file exists, ask what to do
+        if [ $exists -eq 1 ]; then
+            echo File already exists on dptrp1.
+            echo Overwrite? [n/Y]
+            read answer
+            if [ $answer == 'Y' ]; then
+                # overwriting
+                echo Deleting file on dptrp1 before new upload.
+                dptrp1 --addr digitalpaper.local \
+                    delete "Document/$dp_folder/$target_file"
+            else
+                # no overwrite, instead add suffix?
+                echo "Add suffix? [n/Y]"
+                read answer
+                if [ ! $answer == 'Y' ]; then
+                    # no suffix, abort
+                    ul=0
+                    echo "Abort."
+                else
+                    # add suffix, which one?
+                    echo "Type suffix ... [leave empty to abort]"
+                    read answer
+                    if [ $answer == "" ]; then
+                        # empty suffix, abort
+                        ul=0
+                        echo "Abort."
+                    else
+                        # add suffix
+                        target_file="${target_file%.*}$answer.pdf"
+                        echo "Downloading $source_file as $target_file"
+
+                        if [ -f "$target_file" ]; then
+                            # suffixed file exists, overwrite?
+                            echo File exists: "$target_file"
+                            echo Overwrite? [n/Y]
+                            read answer
+                            if [ ! $answer == 'Y' ]; then
+                                # no overwrite of suffixed file, abort
+                                ul=0
+                                echo "Abort."
+                            fi
+                        fi
+                    fi
+                fi
+            fi
+        fi
+
+        # do the actual uploading
+        if [ $ul == 1 ]; then
+            echo Uploading file ...
+            dptrp1 --addr digitalpaper.local \
+                upload "$source_file" "Document/$dp_folder/$target_file"
+            retvar=$?
+            if [ $retvar = 0 ]; then
+                echo Upload successful.
+            else
+                echo ERROR: Upload returned error code "$retvar"
+            fi
+        fi
+    done
+}
+
+
+function dpt-download() {
+
+    for source_file in "${FILES[@]}"
+    do
+        target_file="${source_file%.*}$suffix.pdf"
+        if [ "$target_file" = "$source_file" ];
+        then
+            echo "Downloading $source_file"
+        else
+            echo "Downloading $source_file as $target_file"
+        fi
+
+        dl=1  # downlaod boolean (default yes)
+        if [ -f "$target_file" ]; then
+            # first time file exist, overwrite?
+            echo File exists: "$target_file"
+            echo Overwrite? [n/Y]
+            read answer
+            if [ ! $answer == 'Y' ]; then
+                # no overwrite, instead add suffix?
+                echo "Add suffix? [n/Y]"
+                read answer
+                if [ $answer == 'Y' ]; then
+                    # add suffix, which one?
+                    echo "Type suffix ... [leave empty to abort]"
+                    read answer
+                    if [ $answer == "" ]; then
+                        # empty suffix, abort
+                        dl=0
+                        echo "Abort."
+                    else
+                        # add suffix
+                        target_file="${target_file%.*}$answer.pdf"
+                        echo "Downloading $source_file as $target_file"
+
+                        if [ -f "$target_file" ]; then
+                            # suffixed file exists, overwrite?
+                            echo File exists: "$target_file"
+                            echo Overwrite? [n/Y]
+                            read answer
+                            if [ ! $answer == 'Y' ]; then
+                                # no overwrite of suffixed file, abort
+                                dl=0
+                                echo "Abort."
+                            fi
+                        fi
+                    fi
+                else
+                    # no overwrite at first question
+                    dl=0
+                    echo "Abort."
+                fi
+            # if overwrite, dl=1 stays (default), will happen below
+            fi
+        fi
+
+        if [ $dl == 1 ]; then
+            dptrp1 --addr digitalpaper.local download "Document/$dp_folder/$source_file" "$target_file"
+            retvar=$?
+            if [ $retvar = 0 ]; then
+                echo Download successful.
+            else
+                echo ERROR: Downlaod returned error code "$retvar"
+            fi
+        fi
+    done
+}
+
+
+if [ "$action" = "upload" ]
+then
+    dpt-upload
+elif [ "$action" = "download" ]
+then
+    dpt-download
+else
+    echo "ERROR: shouldn't get here..."
+    exit 1
+fi

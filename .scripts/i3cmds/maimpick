@@ -1,6 +1,7 @@
 #!/bin/sh
 rootdir=~/pictures/screenshots
-selection="$(printf "a selected area
+selection="$(printf "\
+a selected area
 current window
 full screen
 digital paper
@@ -81,23 +82,86 @@ then
     exit 1
 fi
 
+
 if [ -n "$filepath" ]; then
     filename=$(basename -- "$filepath")
     extension="${filename##*.}"
 
     # XXX: check ~/.config/sxiv/exec/key-handler for how to pass directories from bmdirs
-    new_rootdir="$(printf "~/pictures/screenshots\\n~/documents/notes/vim-notes/.images\\n~/documents/notes/vimwiki/images" | dmenu -l 3 -p "Screenshot where to save?" | sed "s|~|$HOME|g")"
+    rm_leading_spaces='s/^[[:space:]]*//'
+    vimwiki_img_dir="~/documents/notes/vimwiki/images"
+    # ~/documents/notes/vim-notes/.images
+    new_rootdir="$(printf "\
+        ~/pictures/screenshots
+        $vimwiki_img_dir" \
+            | sed -e $rm_leading_spaces \
+            | dmenu -l 3 -p "Screenshot where to save?" \
+            | sed "s|~|$HOME|g")"
 
-    new_filename="$(printf "timestemp" | dmenu -l 1 -p "Screenshot file name?")"
+
+    # suggest already existing files as filenames (reverse alphabetic order, -r)
+    rm_ext='s/\.[^.]*$//'
+    note_names=$(ls -r $new_rootdir | sed $rm_ext)
+
+    ## if vimwiki/images, just suggest names of note files in vimwiki/
+    #if [ "$new_rootdir" = "$vimwiki_img_dir" ]; then
+    #    note_names=$(ls -r ~/documents/notes/vimwiki/*.md | sed $rm_ext)
+    #fi
+
+    function get_filename() {
+        new_filename="$(printf "\
+            timestemp
+            $note_names" \
+                | sed $rm_leading_spaces \
+                | dmenu -l 6 -p "Screenshot file name?")"
+    }
+
+    get_filename
+
     if [ "$new_filename" = "timestemp" ]
     then
         # means the default $filepath is used
         unset new_filename
+    else
+        tmp_filepath="$new_rootdir/$new_filename"
+        while [ -f "$tmp_filepath" ] || [ -f "$tmp_filepath.$extension" ]
+        do
+            # red overwrite question, copied from ~/.scripts/i3cmds/prompt
+            msg="$new_filename exists, OVERWRITE?"
+            overwrite=$(printf "No (change filename)\\nYes\\nAbort" \
+                | dmenu -i -p "$msg" -nb darkred -sb red -sf white -nf gray)
+            if [ "$overwrite" = "Yes" ]
+            then
+                break
+            elif [ "$overwrite" = "Abort" ]
+            then
+                # leave screenshot in screenshot directory
+                unset new_filename
+                break
+            elif [ "$overwrite" = "No" ]
+            then
+                get_filename
+            else
+                notify-send "ERROR in maimpick overwrite prompt"
+                break
+            fi
+            tmp_filepath="$new_rootdir/$new_filename"
+        done
     fi
 
     if [ -n "$new_filename" ]
     then
         new_extension="${new_filename##*.}"
+
+        ## append index to filename if it already exists
+        #original_filepath=$new_rootdir/$new_filename
+        #tmp_filepath="$original_filepath"
+        #idx=0
+        #while [ -f "$tmp_filepath" ] || [ -f "$tmp_filepath".$extension ]; do
+        #    idx=$((idx + 1))
+        #    tmp_filepath="${original_filepath##.$extension}-$idx"
+        #done
+
         if [ "$new_extension" = "$extension" ]
         then
             # extension was given in new filename, don't append it again
@@ -116,11 +180,14 @@ if [ -n "$filepath" ]; then
     case $new_rootdir in
         "$HOME/documents/notes/vim-notes/.images")
             relpath="./.images/$full_filename"
-            xclip -selection clipboard "$relpath" && notify-send "Copied $relpath to clipboard"
+            xclip -selection clipboard "$relpath" \
+                && notify-send "Copied $relpath to clipboard"
             ;;
         "$HOME/documents/notes/vimwiki/images")
             relpath="images/$full_filename"
-            echo "$relpath" | xclip && notify-send "Copied $relpath to clipboard"
+            echo "$relpath" \
+                | xclip -selection clipboard \
+                && notify-send "Copied $relpath to clipboard"
             ;;
     esac
 fi

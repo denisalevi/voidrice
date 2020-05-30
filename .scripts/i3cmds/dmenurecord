@@ -9,6 +9,8 @@
 #
 # If there is already a running instance, user will be prompted to end it.
 
+rm_leading_spaces='s/^[[:space:]]*//'
+
 updateicon() { \
 	echo "$1" > /tmp/recordingicon
 	pkill -RTMIN+9 i3blocks
@@ -26,6 +28,28 @@ killrecording() {
 	kill -9 "$recpid"
 	exit
 	}
+
+screencast_no_mic() { \
+    # TODO: this works but the video file is huge, change codec/quality
+    # settings...
+    echo "Click a window to start recording";
+    read x y W H <<< $(xwininfo \
+        | grep -e Width -e Height -e Absolute \
+        | grep -oE "[[:digit:]]{1,}" \
+        | tr "\n" " ")
+    #ffmpeg -f alsa -ac 1 -i pulse -f x11grab -s ${W}x${H} -r 25 -i :0.0+${x},${y} -sameq output.mkv
+	ffmpeg -y \
+	-f x11grab \
+	-framerate 30 \
+	-s ${W}x${H} \
+	-i :0.0+${x},${y} \
+	-f pulse -i alsa_output.pci-0000_00_1f.3.analog-stereo.monitor \
+	-r 30 \
+ 	-c:v libx264rgb -crf 0 -preset ultrafast -c:a flac \
+	"$HOME/screencast-$(date '+%y%m%d-%H%M-%S').mkv" &
+	echo $! > /tmp/recordingpid
+	updateicon "⏺️🎙️"
+}
 
 screencast() { \
 	ffmpeg -y \
@@ -80,8 +104,17 @@ audio() { \
 	}
 
 askrecording() { \
-	choice=$(printf "screencast\\nvideo\\naudio\\nwebcam\\nwebcam (hi-def)" | dmenu -i -p "Select recording style:")
+	choice=$(printf "\
+        screencast (no mic)
+        screencast
+        video
+        audio
+        webcam
+        webcam (hi-def)" \
+        | sed $rm_leading_spaces \
+        | dmenu -i -p "Select recording style:")
 	case "$choice" in
+        "screencast (no mic)") screencast_no_mic;;
 		screencast) screencast;;
 		audio) audio;;
 		video) video;;

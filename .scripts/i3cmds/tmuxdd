@@ -1,4 +1,6 @@
 #!/bin/sh
 # This is the script that i3 runs to either start tmux in
 # the dropdown terminal or log into a previous session.
-tmux a || tmux
+# CHANGE: now it does either creates a new session names `dropdown` or connect
+# to a previous tmux session with that name, not just any tmux session
+tmux a -t dropdown || tmux new -s dropdown

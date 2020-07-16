@@ -1,0 +1,32 @@
+#!/bin/sh
+function gpu_memory () {
+    #printf "%sMi/%sMi\n" $(nvidia-smi -q -d MEMORY | grep "
+    printf "%s%s\n" $(nvidia-smi -q | grep "Memory.*%" | awk -F':' '{print $2}')
+}
+
+function gpu_utilization () {
+    printf "%s%s\n" $(nvidia-smi -q | grep "Gpu.*%" | awk -F':' '{print $2}')
+}
+
+function gpu_name () {
+    printf "%s\n" $(nvidia-smi -L | awk '{print $4}')
+}
+
+case $BLOCK_BUTTON in
+	1) notify-send "⚙ GPU hogs not implemented" ;;
+	#2) setsid "$TERMINAL" -e gpustat -i & ;;
+    2) i3-msg "exec --no-startup-id ddspawn gpustatdd" > /dev/null ;;
+	3) notify-send "🖥GPU module " "\- Shows GPU state.
+- Click to show intensive processes.
+- Middle click to open gpustat." ;;
+esac
+
+state=$(cat /proc/acpi/bbswitch | awk '{print $2}')
+if [ "$state" = 'ON' ]; then
+    printf " ✔\n"
+elif [ "$state" = 'OFF' ]
+then
+    printf " ❌\n"
+fi
+# get temperatur
+# nvidia-smi -q -d TEMPERATURE | awk -F':' '/Current Temp {print $2}'

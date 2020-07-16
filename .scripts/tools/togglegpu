@@ -1,0 +1,31 @@
+#!/bin/sh
+# toggle nvidia gpu on/off
+
+get_state() {
+    state=$(cat /proc/acpi/bbswitch | awk '{print $2}')
+}
+
+get_state
+
+if [ "$state"  = 'OFF' ]
+then
+    # turn on GPU
+	sudo tee /proc/acpi/bbswitch <<< ON
+    # check if GPU is on
+    get_state
+    if [ "$state" != 'ON' ]
+    then
+        echo "ERROR: couldn't turn on GPU."
+    fi
+else
+    # unload nvidia driver
+    sudo modprobe -r nvidia_uvm nvidia
+    # turn off GPU
+	sudo tee /proc/acpi/bbswitch <<< OFF
+    # check if GPU if off
+    get_state
+    if [ "$state" != 'OFF' ]
+    then
+        echo "ERROR: couldn't turn off GPU."
+    fi
+fi

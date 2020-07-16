@@ -1,0 +1,5 @@
+#!/bin/sh
+# List files recursively by last modified date
+# $1: directory to search recursively in
+find $1 -type f -exec stat --format '%Y :%y %n' "{}" \; | sort -nr | cut -d: -f2- | head
+

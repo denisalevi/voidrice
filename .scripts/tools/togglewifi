@@ -1,0 +1,11 @@
+#!/bin/sh
+# toggle wifi on/off
+
+if rfkill -ro Soft list wifi | grep -q "^blocked"
+then
+  	sudo rfkill unblock wifi
+	echo "ON"
+else
+  	sudo rfkill block wifi
+	echo "OFF"
+fi

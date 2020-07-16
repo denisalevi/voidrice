@@ -12,21 +12,26 @@ function gpu_name () {
     printf "%s\n" $(nvidia-smi -L | awk '{print $4}')
 }
 
+function gpu_state () {
+    state=$(cat /proc/acpi/bbswitch | awk '{print $2}')
+    if [ "$state" = 'ON' ]; then
+        printf " ✔\n"
+    elif [ "$state" = 'OFF' ]
+    then
+        printf " ❌\n"
+    fi
+}
+
 case $BLOCK_BUTTON in
-	1) notify-send "⚙ GPU hogs not implemented" ;;
+	1) togglegpu > /dev/null; gpu_state ;;
 	#2) setsid "$TERMINAL" -e gpustat -i & ;;
     2) i3-msg "exec --no-startup-id ddspawn gpustatdd" > /dev/null ;;
 	3) notify-send "🖥GPU module " "\- Shows GPU state.
-- Click to show intensive processes.
+- Click to toggle GPU on/off.
 - Middle click to open gpustat." ;;
 esac
 
-state=$(cat /proc/acpi/bbswitch | awk '{print $2}')
-if [ "$state" = 'ON' ]; then
-    printf " ✔\n"
-elif [ "$state" = 'OFF' ]
-then
-    printf " ❌\n"
-fi
+gpu_state
+
 # get temperatur
 # nvidia-smi -q -d TEMPERATURE | awk -F':' '/Current Temp {print $2}'

@@ -14,6 +14,10 @@ alias ka="killall" \
 	sdn="sudo shutdown -h now" \
 	gua="git remote | xargs -L1 git push --all" \
 	ls="ls -hN --color=auto --group-directories-first" \
+    ll="ls -al" \
+    la="ls -A" \
+    l="ls -l" \
+    lll="ls -latr" \
 	grep="grep --color=auto" \
 	diff="diff --color=auto" \
 	ccat="highlight --out-format=ansi" \
@@ -23,7 +27,29 @@ alias ka="killall" \
 	ref="shortcuts >/dev/null; source ~/.config/shortcutrc" \
 	upc="sudo pacman -Syu; pkill -RTMIN+8 i3blocks" \
 	lsp="pacman -Qett --color=always | less" \
-	ffmpeg="ffmpeg -hide_banner"
+	ffmpeg="ffmpeg -hide_banner" \
+	sudo="sudo " \
+    vim_b2c='cd ~/projects/brian2cuda/brian2cuda_repository \
+        && vim -c "set path+=frozen_repos/brian2" \
+        $(fd -e py -e cu -e h -E frozen_repos)' \
+    vim_brian='cd \
+        ~/projects/brian2cuda/brian2cuda_repository/frozen_repos/brian2 \
+        && vim $(fd -e py -e cpp -e h)' \
+    b2c='conda activate b2c' \
+    ipykernel_install='python -m ipykernel install --user \
+        --name "$CONDA_DEFAULT_ENV" --display-name "$CONDA_DEFAULT_ENV"' \
+    ca='conda activate' \
+    lmake='latexmk -jobname=output -pdflatex="pdflatex -file-line-error \
+        -shell-escape -synctex=1 -interaction=nonstopmode" -bibtex -pdf' \
+    lmakep='lmake -pvc' \
+    lc='latexmk -c' \
+    lC='latexmk -C' \
+    notes='cd ~/documents/notes/vimwiki && vim index.md' \
+    b2cwiki='cd ~/projects/brian2cuda/brian2cuda-wiki && vim index.md' \
+    sprekelerlab_wiki='cd ~/git/sprekelerlab/wiki.wiki && vim index.md' \
+    dptrp1='dptrp1 --addr digitalpaper.local'
+
+eval "$(thefuck --alias)"
 
 command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d" # Use neovim for vim if present.
 
@@ -31,3 +57,44 @@ shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o
 se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
 sv() { vcopy "$(du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf)" ;}
 vf() { fzf | xargs -r -I % $EDITOR % ;}
+
+nvim() {
+    # check the terminal background color and let vim know if it is light
+    # or dark theme (XXX: only works for gruvbox-medium themes set with
+    # wal)
+
+    # load $background
+    source ~/.cache/wal/colors.sh
+
+    if [[ "$background" == "#fbf1c7" ]]; then
+        BACKGROUND=light
+    elif [[ "$background" == "#282828" ]]; then
+        BACKGROUND=dark
+    else
+        BACKGROUND=dark
+        echo "ERROR in %:vim() : unkown $background colour. Using bg=dark."
+    fi
+
+    # let vim know background
+    env nvim --cmd "let my_terminal_bg = '$BACKGROUND'" "$@"
+}
+
+vimcluster() {
+    # Open file on cluster remote using vim netrw plugin
+    # Usage:
+    #   vimcluster $1 $2 ...
+    #       where arguments are the paths relative to current directory
+    #       arguments can be . but .. does not work
+    new_args=()
+    to_remove="tubcloud/home/"
+    remote_pwd=${PWD//$to_remove/}
+    for arg in "$@"
+    do
+        new_arg="scp://cluster//cognition/$remote_pwd/$arg"
+        # remove trailing dot to open current directory (dot does not work)
+        new_arg=${new_arg%"."}
+        new_args+=( $new_arg )
+    done
+    echo "Executing: vim ${new_args[@]}"
+    vim ${new_args[@]}
+}

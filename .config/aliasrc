@@ -41,6 +41,7 @@ alias ka="killall" \
     ca='conda activate' \
     lmake='latexmk -jobname=output -pdflatex="pdflatex -file-line-error \
         -shell-escape -synctex=1 -interaction=nonstopmode" -bibtex -pdf' \
+
     lmakep='lmake -pvc' \
     lc='latexmk -c' \
     lC='latexmk -C' \
@@ -57,6 +58,7 @@ shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o
 se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
 sv() { vcopy "$(du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf)" ;}
 vf() { fzf | xargs -r -I % $EDITOR % ;}
+
 
 nvim() {
     # check the terminal background color and let vim know if it is light
@@ -79,6 +81,7 @@ nvim() {
     env nvim --cmd "let my_terminal_bg = '$BACKGROUND'" "$@"
 }
 
+
 vimcluster() {
     # Open file on cluster remote using vim netrw plugin
     # Usage:
@@ -98,3 +101,34 @@ vimcluster() {
     echo "Executing: vim ${new_args[@]}"
     vim ${new_args[@]}
 }
+
+
+# source gtk scale environmental variables before launching
+eclipse_with_dpi_scaling() {
+    # save GDK_..._SCALE if they are already set
+    if [ -n "$GDK_SCALE" ]; then
+        GDK_SCALE_OLD=$GDK_SCALE
+    fi
+    if [ -n "$GDK_DPI_SCALE" ]; then
+        GDK_SCALE_DPI_OLD=$GDK_DPI_SCALE
+    fi
+
+    cat ~/.gtk-3-scale
+    notify-send $(cat ~/.gtk-3-scale)
+    source ~/.gtk-3-scale
+
+    eclipse "$@"
+
+    # restore previous variables
+    if [ -n "$GDK_SCALE_OLD" ]; then
+        export GDK_SCALE=$GDK_SCALE_OLD
+    else
+        unset GDK_SCALE
+    fi
+    if [ -n "$GDK_DPI_SCALE" ]; then
+        export GDK_SCALE_DPI=$GDK_DPI_SCALE_OLD
+    else
+        unset GDK_DPI_SCALE
+    fi
+}
+alias eclipse='eclipse_with_dpi_scaling'

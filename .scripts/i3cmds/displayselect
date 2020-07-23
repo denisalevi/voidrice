@@ -68,10 +68,32 @@ screens=$(echo "$allposs" | grep " connected" | awk '{print $1}')
 # Get user choice including multi-monitor and manual selection:
 chosen=$(printf "%s\\nmulti-monitor\\nmanual selection\\nload layout" "$screens" | dmenu -i -p "Select display arangement:") &&
 case "$chosen" in
-	"manual selection") arandr ; exit ;;
-	"multi-monitor") multimon ;;
-	"load layout") loadlayout ;;
-	*) xrandr --output "$chosen" --auto --scale 1.0x1.0 $(echo "$allposs" | grep -v "$chosen" | awk '{print "--output", $1, "--off"}' | tr '\n' ' ') ;;
+	"manual selection")
+        arandr
+        exit
+        ;;
+	"multi-monitor")
+        multimon
+        ;;
+	"load layout")
+        loadlayout
+        ;;
+	*)
+        xrandr \
+        --output "$chosen" \
+        --auto \
+        --scale 1.0x1.0 \
+        $(echo "$allposs" \
+            | grep -v "$chosen" \
+            | awk '{print "--output", $1, "--off"}' \
+            | tr '\n' ' ') \
+
+        width=$(xrandr --dryrun --output eDP1 --preferred \
+                | awk -F' ' '{print $3}' \
+                | awk -F'x' '{print $1}')
+        width_k=$(( width/1000 ))
+        scaledpi "$width_k"k  # 2k or 4k
+        ;;
 esac
 
 setbg		# Fix background if screen size/arangement has changed.

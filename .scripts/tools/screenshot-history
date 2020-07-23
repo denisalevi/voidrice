@@ -1,0 +1,15 @@
+#!/bin/bash
+new_line="$@"
+
+filename=~/.screenshot_history
+history_size=100
+
+num_lines=$(wc -l < "$filename")
+
+if [ "$num_lines" -ge "$history_size" ]; then
+    # delete first line
+    sed -i '1,1d' $filename
+fi
+
+# Append line to file
+echo "$new_line" >> $filename

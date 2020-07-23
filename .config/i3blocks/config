@@ -41,7 +41,11 @@ label=🧠
 
 [cpu]
 interval=15
-label=💻
+#label=💻
+
+[gpu]
+interval=5
+label=⚙
 
 [volume]
 interval=once
@@ -51,9 +55,9 @@ signal=10
 #interval=60
 #command=disk /
 
-#[disk]
-#interval=60
-#command=disk /home 🏠
+[disk]
+interval=60
+command=disk /home 🏠
 
 [battery]
 command=battery BAT0

@@ -8,3 +8,7 @@ vv	~/Videos
 cf	~/.config
 sc	~/.scripts
 mn	/mnt
+vni 	~/documents/notes/vim-notes/.images
+vwi 	~/documents/notes/vimwiki/images
+mhbf 	~/documents/teaching/mhbf/2019-WS
+dro 	~/projects/drosophila_consolidation

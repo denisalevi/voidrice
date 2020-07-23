@@ -4,8 +4,10 @@
 # Adds `~/.scripts` and all subdirectories to $PATH
 export PATH="$PATH:$(du "$HOME/.scripts/" | cut -f2 | tr '\n' ':' | sed 's/:*$//')"
 export EDITOR="nvim"
+export VISUAL="nvim"
 export TERMINAL="st"
 export BROWSER="firefox"
+export ALTBROWSER="chromium"
 export READER="zathura"
 export FILE="vu"
 export BIB="$HOME/Documents/LaTeX/uni.bib"
@@ -33,3 +35,17 @@ echo "$0" | grep "bash$" >/dev/null && [ -f ~/.bashrc ] && source "$HOME/.bashrc
 
 # Set caps to excape if tty:
 sudo -n loadkeys ~/.scripts/ttymaps.kmap 2>/dev/null
+
+# zsh like implementation of precmd: sends bell alarm after command execution
+# in TMUX
+if [ -f ~/.bash-preexec.sh ]
+then
+    source ~/.bash-preexec.sh
+    precmd() {
+        if [ -n "$TMUX" ]
+        then
+            # -e '\a' sends bell alarm, -n does not print trialing newline
+            echo -n -e '\a'
+        fi
+    }
+fi

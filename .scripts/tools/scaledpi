@@ -10,13 +10,9 @@
 # then reducing it with xrandr --scale 1.333x1.333 (uses screen scaling and
 # takes non-integers)
 
-import argparse
 
-parser = argparse.ArgumentParser(description="Set screen DPI scaling")
-parser.add_argument('resolution', type=str, choices=['2k', '4k'],
-                    help='Set the screen resolution')
-args = parser.parse_args()
-
+### SCALING CONFIGS
+##############################################################
 # Thinkpad T480 screen, 150% scaling
 config_2k = {
     # GDK 3 (GTK 3) icon scaling
@@ -39,6 +35,15 @@ config_4k = {
     # Xressources
     'Xft.dpi': 192
 }
+##############################################################
+
+
+import argparse
+
+parser = argparse.ArgumentParser(description="Set screen DPI scaling")
+parser.add_argument('resolution', type=str, choices=['2k', '4k'],
+                    help='Set the screen resolution')
+args = parser.parse_args()
 
 if args.resolution == '2k':
     config = config_2k
@@ -50,6 +55,11 @@ else:
 import subprocess
 import os
 
+def report(message, **kwargs):
+    """ Python print and notify-send message. """
+    print(message)
+    subprocess.run(['notify-send', message], **kwargs)
+
 # Set firefox
 dppp = config['layout.css.devPixelsPerPx']
 ret = subprocess.run([f'ff-set-preference',
@@ -58,7 +68,7 @@ if ret.returncode:
     msg = "ERROR setting layout.css.devPixelsPerPx"
 else:
     msg = f"Firefox DPI:\n {dppp}"
-subprocess.run(['notify-send', msg])
+report(msg)
 
 # set GTK 3
 gtk_config = f"""
@@ -71,9 +81,8 @@ export GDK_DPI_SCALE={config['GDK_DPI_SCALE']}
 """
 with open(os.path.expanduser('~/.gtk-3-scale'), 'w') as file:
     file.write(gtk_config)
-subprocess.run(['notify-send',
-                (f"GDK_SCALE={config['GDK_SCALE']}\n"
-                 f"GDK_DPI_SCALE={config['GDK_DPI_SCALE']}")])
+report(f"GDK_SCALE={config['GDK_SCALE']}\n"
+       f"GDK_DPI_SCALE={config['GDK_DPI_SCALE']}")
 
 # Set Xressources
 tmp_xressource = '/tmp/.Xressource-tmp'
@@ -84,12 +93,12 @@ if ret.returncode:
     msg = f"ERROR setting xrdb Xft.dpi"
 else:
     msg = f"Xft.dpi:\n {config['Xft.dpi']}"
-subprocess.run(['notify-send', msg])
+report(msg)
 
 ret = subprocess.run(['remaps'])
 if ret.returncode:
-    subprocess.run(["notify-send", "ERROR in remaps"])
+    report("ERROR in remaps")
 
-ret = subprocess.run(['i3-msg', 'restart'])
+ret = subprocess.run(['i3-msg', 'restart'], stdout= subprocess.DEVNULL)
 if ret.returncode:
-    subprocess.run(["notify-send", "ERROR restarting i3"])
+    report("ERROR restarting i3")

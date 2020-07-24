@@ -9,6 +9,8 @@
 # TODO: 150% scaling can also be achieved by setting GDK_SCALE=2 (too big) and
 # then reducing it with xrandr --scale 1.333x1.333 (uses screen scaling and
 # takes non-integers)
+# TODO: notify-send <summary> <message> prints the summary in bold and message
+# not. Currently all messages are printed as summary. Change that.
 
 
 ### SCALING CONFIGS
@@ -41,34 +43,54 @@ config_4k = {
 import argparse
 
 parser = argparse.ArgumentParser(description="Set screen DPI scaling")
-parser.add_argument('resolution', type=str, choices=['2k', '4k'],
-                    help='Set the screen resolution')
+parser.add_argument('resolution', type=int, #choices=['2k', '4k'],
+                    help=("Set the screen resolution. 2 and 4 are interpreted as "
+                          "2000 and 4000."))
 args = parser.parse_args()
-
-if args.resolution == '2k':
-    config = config_2k
-elif args.resolution == '4k':
-    config = config_4k
-else:
-    assert False, 'argparse failed'
 
 import subprocess
 import os
+import time
 
-def report(message, **kwargs):
+def report(message, error=False, **kwargs):
     """ Python print and notify-send message. """
+    urgency = 'normal'
+    if error:
+        urgency = 'critical'
     print(message)
-    subprocess.run(['notify-send', message], **kwargs)
+    subprocess.run(['notify-send', #'--expire-time=2000',
+                    f'--urgency={urgency}', message],
+                   **kwargs)
+
+if args.resolution == 2:
+    k = 2
+elif args.resolution == 4:
+    k = 4
+elif args.resolution < 2900:
+    k = 2
+elif args.resolution > 3800:
+    k = 4
+
+if k == 2:
+    config = config_2k
+elif k == 4:
+    config = config_4k
+else:
+    msg = f"Only 2k and 4k display configs are available, got {args.resolution}"
+    report(msg, error=True)
+    raise NotImplementedError(msg)
+
 
 # Set firefox
 dppp = config['layout.css.devPixelsPerPx']
 ret = subprocess.run([f'ff-set-preference',
                       'layout.css.devPixelsPerPx', f'{dppp}'], check=True)
 if ret.returncode:
-    msg = "ERROR setting layout.css.devPixelsPerPx"
+    msg_firefox = "ERROR setting layout.css.devPixelsPerPx"
+    error_firefox = True
 else:
-    msg = f"Firefox DPI:\n {dppp}"
-report(msg)
+    msg_firefox = f"Firefox DPI:\n {dppp}"
+    error_firefox = False
 
 # set GTK 3
 gtk_config = f"""
@@ -81,8 +103,8 @@ export GDK_DPI_SCALE={config['GDK_DPI_SCALE']}
 """
 with open(os.path.expanduser('~/.gtk-3-scale'), 'w') as file:
     file.write(gtk_config)
-report(f"GDK_SCALE={config['GDK_SCALE']}\n"
-       f"GDK_DPI_SCALE={config['GDK_DPI_SCALE']}")
+msg_GTK = (f"GDK_SCALE={config['GDK_SCALE']}\n"
+           f"GDK_DPI_SCALE={config['GDK_DPI_SCALE']}")
 
 # Set Xressources
 tmp_xressource = '/tmp/.Xressource-tmp'
@@ -90,18 +112,27 @@ with open(tmp_xressource, 'w') as file:
     file.write(f"Xft.dpi : {config['Xft.dpi']}")
 ret = subprocess.run(['xrdb', '-merge', tmp_xressource])
 if ret.returncode:
-    msg = f"ERROR setting xrdb Xft.dpi"
+    msg_Xtf = f"ERROR setting xrdb Xft.dpi"
+    error_Xft = True
 else:
-    msg = f"Xft.dpi:\n {config['Xft.dpi']}"
-report(msg)
+    msg_Xtf = f"Xft.dpi:\n {config['Xft.dpi']}"
+    error_Xft = False
 
 ret = subprocess.run(['remaps'])
 if ret.returncode:
-    report("ERROR in remaps")
+    report("ERROR in remaps", error=True)
 
-ret = subprocess.run(['i3-msg', 'restart'], stdout= subprocess.DEVNULL)
+ret = subprocess.run(['i3-msg', 'restart'], stdout=subprocess.DEVNULL)
 if ret.returncode:
-    msg = "ERROR restarting i3"
+    msg_i3 = "ERROR restarting i3"
+    error_i3 = True
 else:
-    msg = "Restarted i3"
-report(msg)
+    msg_i3 = "Restarted i3"
+    error_i3 = False
+
+time.sleep(1)
+
+report(msg_firefox, error=error_firefox)
+report(msg_GTK, error=False)
+report(msg_Xtf, error=error_Xft)
+report(msg_i3, error=error_i3)

@@ -101,4 +101,7 @@ if ret.returncode:
 
 ret = subprocess.run(['i3-msg', 'restart'], stdout= subprocess.DEVNULL)
 if ret.returncode:
-    report("ERROR restarting i3")
+    msg = "ERROR restarting i3"
+else:
+    msg = "Restarted i3"
+report(msg)

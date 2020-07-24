@@ -66,7 +66,7 @@ allposs=$(xrandr -q | grep "connected")
 screens=$(echo "$allposs" | grep " connected" | awk '{print $1}')
 
 # Get user choice including multi-monitor and manual selection:
-chosen=$(printf "%s\\nmulti-monitor\\nmanual selection\\nload layout" "$screens" | dmenu -i -p "Select display arangement:") &&
+chosen=$(printf "%s\\nmulti-monitor\\nmanual selection\\nload layout" "$screens" | dmenu -i -p "Select display arangement:") && \
 case "$chosen" in
 	"manual selection")
         arandr
@@ -88,11 +88,8 @@ case "$chosen" in
             | awk '{print "--output", $1, "--off"}' \
             | tr '\n' ' ') \
 
-        width=$(xrandr --dryrun --output "$chosen" --preferred \
-                | awk -F' ' '{print $3}' \
-                | awk -F'x' '{print $1}')
-        width_k=$(( width/1000 ))
-        scaledpi "$width_k"k  # 2k or 4k
+        width=$(xrandr --dryrun --output "$chosen" --preferred | awk -F' ' '{print $3}' | awk -F'x' '{print $1}')
+        scaledpi "$width"
         ;;
 esac
 

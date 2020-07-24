@@ -88,7 +88,7 @@ case "$chosen" in
             | awk '{print "--output", $1, "--off"}' \
             | tr '\n' ' ') \
 
-        width=$(xrandr --dryrun --output eDP1 --preferred \
+        width=$(xrandr --dryrun --output "$chosen" --preferred \
                 | awk -F' ' '{print $3}' \
                 | awk -F'x' '{print $1}')
         width_k=$(( width/1000 ))

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Activate conda environment for brian2CUDA development.
+# This script can be run in shells that don't source aliases.
+
+# activate conda commands
+source /etc/profile.d/conda.sh
+/usr/bin/conda activate b2c

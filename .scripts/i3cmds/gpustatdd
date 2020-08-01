@@ -1,2 +1,6 @@
 #!/bin/sh
-gpustat -i
+#gpustat -i
+#
+#tmux a -t dropdown || tmux new -s dropdown
+
+tmux s -t ressources || tmuxp load ressources

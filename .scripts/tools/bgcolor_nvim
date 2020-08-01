@@ -1,0 +1,21 @@
+#!/bin/bash
+# Start nvim but check background color first (set with wal)
+
+# check the terminal background color and let vim know if it is light
+# or dark theme (XXX: only works for gruvbox-medium themes set with
+# wal)
+
+# load $background
+source ~/.cache/wal/colors.sh
+
+if [[ "$background" == "#fbf1c7" ]]; then
+    BACKGROUND=light
+elif [[ "$background" == "#282828" ]]; then
+    BACKGROUND=dark
+else
+    BACKGROUND=dark
+    echo "ERROR in %:vim() : unkown $background colour. Using bg=dark."
+fi
+
+# let vim know background
+env nvim --cmd "let my_terminal_bg = '$BACKGROUND'" "$@"

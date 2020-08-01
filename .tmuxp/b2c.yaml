@@ -1,0 +1,48 @@
+session_name: b2c-dev
+start_directory: ~/projects/brian2cuda/
+#shell_command_before: "source /usr/bin/activate b2c"
+windows:
+- layout: c43d,136x74,0,0,0
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command:
+    - conda activate b2c
+    - ~/.scripts/tools/brian2_vim_source
+  window_name: brian
+- layout: c43e,136x74,0,0,1
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command:
+    - conda activate b2c
+    - ~/.scripts/tools/b2c_vim_source
+  window_name: b2c
+- layout: c43f,136x74,0,0,2
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: bash
+  start_directory: /home/denis/tubcloud/home/projects/brian2cuda
+  window_name: terminal
+- layout: c440,136x74,0,0,3
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: nvim index.md
+  start_directory: /home/denis/tubcloud/home/projects/brian2cuda/brian2cuda-wiki
+  window_name: wiki
+  window_idx: 8
+- focus: 'true'
+  layout: c441,136x74,0,0,4
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: notes
+  window_name: notes
+  window_idx: 9

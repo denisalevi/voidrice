@@ -29,19 +29,14 @@ alias ka="killall" \
 	lsp="pacman -Qett --color=always | less" \
 	ffmpeg="ffmpeg -hide_banner" \
 	sudo="sudo " \
-    vim_b2c='cd ~/projects/brian2cuda/brian2cuda_repository \
-        && vim -c "set path+=frozen_repos/brian2" \
-        $(fd -e py -e cu -e h -E frozen_repos)' \
-    vim_brian='cd \
-        ~/projects/brian2cuda/brian2cuda_repository/frozen_repos/brian2 \
-        && vim $(fd -e py -e cpp -e h)' \
-    b2c='conda activate b2c' \
+    vim_b2c='b2c_vim_source' \
+    vim_brian='brian2_vim_source' \
+    b2c='conda activate b2c && tmuxp load b2c' \
     ipykernel_install='python -m ipykernel install --user \
         --name "$CONDA_DEFAULT_ENV" --display-name "$CONDA_DEFAULT_ENV"' \
     ca='conda activate' \
     lmake='latexmk -jobname=output -pdflatex="pdflatex -file-line-error \
         -shell-escape -synctex=1 -interaction=nonstopmode" -bibtex -pdf' \
-
     lmakep='lmake -pvc' \
     lc='latexmk -c' \
     lC='latexmk -C' \
@@ -52,34 +47,13 @@ alias ka="killall" \
 
 eval "$(thefuck --alias)"
 
-command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d" # Use neovim for vim if present.
+# Use neovim for vim if present and use nvim script that checks wal bg color
+command -v nvim >/dev/null && alias nvim='bgcolor_nvim' vim="nvim" vimdiff="nvim -d"
 
 shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o http.*pdf) ;}
 se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
 sv() { vcopy "$(du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf)" ;}
 vf() { fzf | xargs -r -I % $EDITOR % ;}
-
-
-nvim() {
-    # check the terminal background color and let vim know if it is light
-    # or dark theme (XXX: only works for gruvbox-medium themes set with
-    # wal)
-
-    # load $background
-    source ~/.cache/wal/colors.sh
-
-    if [[ "$background" == "#fbf1c7" ]]; then
-        BACKGROUND=light
-    elif [[ "$background" == "#282828" ]]; then
-        BACKGROUND=dark
-    else
-        BACKGROUND=dark
-        echo "ERROR in %:vim() : unkown $background colour. Using bg=dark."
-    fi
-
-    # let vim know background
-    env nvim --cmd "let my_terminal_bg = '$BACKGROUND'" "$@"
-}
 
 
 vimcluster() {
@@ -101,34 +75,3 @@ vimcluster() {
     echo "Executing: vim ${new_args[@]}"
     vim ${new_args[@]}
 }
-
-
-# source gtk scale environmental variables before launching
-eclipse_with_dpi_scaling() {
-    # save GDK_..._SCALE if they are already set
-    if [ -n "$GDK_SCALE" ]; then
-        GDK_SCALE_OLD=$GDK_SCALE
-    fi
-    if [ -n "$GDK_DPI_SCALE" ]; then
-        GDK_SCALE_DPI_OLD=$GDK_DPI_SCALE
-    fi
-
-    cat ~/.gtk-3-scale
-    notify-send $(cat ~/.gtk-3-scale)
-    source ~/.gtk-3-scale
-
-    eclipse "$@"
-
-    # restore previous variables
-    if [ -n "$GDK_SCALE_OLD" ]; then
-        export GDK_SCALE=$GDK_SCALE_OLD
-    else
-        unset GDK_SCALE
-    fi
-    if [ -n "$GDK_DPI_SCALE" ]; then
-        export GDK_SCALE_DPI=$GDK_DPI_SCALE_OLD
-    else
-        unset GDK_DPI_SCALE
-    fi
-}
-alias eclipse='eclipse_with_dpi_scaling'

@@ -1,0 +1,8 @@
+#!/bin/bash
+# Load all brian2 source files
+# Exclude folders with -E in `fd`
+
+cd ~/projects/brian2cuda/brian2cuda_repository/frozen_repos/brian2
+
+# use bgcolor_nvim which load correct bg color set with wal
+bgcolor_nvim $(fd -e py -e cpp -e h)

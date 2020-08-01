@@ -2,6 +2,29 @@
 # Activate conda environment for brian2CUDA development.
 # This script can be run in shells that don't source aliases.
 
-# activate conda commands
-source /etc/profile.d/conda.sh
-/usr/bin/conda activate b2c
+### XXX NOT USED. This does not work when just executed, the script needs to be
+# sourced: `source b2c_conda_activate`
+# But instead one can just use: `source /usr/bin/activate b2c`, which does the
+# same (except of checking if b2c was activated before, which might not be
+# necessary.
+
+# Activate b2c only if it is not already active
+if [ "$CONDA_DEFAULT_ENV" = 'b2c' ]; then
+    echo "EXIT"
+    exit
+fi
+
+# Source conda commands if not sourced yet
+if [ -n "$CONDA_EXE" ]; then
+    echo "NOT SOURCED"
+    # activate conda commands
+    source /etc/profile.d/conda.sh
+fi
+
+# If another environemnt is active, deactivate it
+if [ -n "$CONDA_DEFAULT_ENV" ]; then
+    echo "DEACT"
+    conda deactivate
+fi
+echo "SET"
+conda activate b2c

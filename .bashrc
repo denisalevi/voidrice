@@ -9,7 +9,6 @@ export PS1="\[$(tput bold)\]\[$(tput setaf 1)\][\[$(tput setaf 3)\]\u\[$(tput se
 
 # activate conda commands
 source /etc/profile.d/conda.sh
-export CONDA_EXE=/usr/bin/conda
 
 # add local binary folder
 export PATH="$PATH:~/.local/bin/"
@@ -23,3 +22,6 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/opt/cuda
 # wal setup (https://github.com/dylanaraps/pywal/wiki/Getting-Started)
 (cat ~/.cache/wal/sequences &)
 source ~/.cache/wal/colors-tty.sh
+
+# tab-completion for tmuxp
+eval "$(_TMUXP_COMPLETE=source tmuxp)"

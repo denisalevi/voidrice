@@ -3,6 +3,7 @@ start_directory: ~/projects/brian2cuda/
 #shell_command_before: "source /usr/bin/activate b2c"
 windows:
 - layout: c43d,136x74,0,0,0
+  start_directory: ~/projects/brian2cuda/brian2cuda_repository/frozen_repos/brian2/
   options:
     automatic-rename: 'off'
   panes:
@@ -12,6 +13,7 @@ windows:
     - ~/.scripts/tools/brian2_vim_source
   window_name: brian
 - layout: c43e,136x74,0,0,1
+  start_directory: ~/projects/brian2cuda/brian2cuda_repository/
   options:
     automatic-rename: 'off'
   panes:
@@ -27,7 +29,7 @@ windows:
   panes:
   - focus: 'true'
     shell_command: bash
-  start_directory: /home/denis/tubcloud/home/projects/brian2cuda
+  start_directory: /home/denis/tubcloud/home/projects/brian2cuda/dev
   window_name: terminal
 - layout: c440,136x74,0,0,3
   options:

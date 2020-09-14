@@ -50,37 +50,4 @@ then
     }
 fi
 
-# source gtk scale environmental variables before launching
-gtk_application_with_dpi_scaling() {
-    # $1 is the application name with all options etc.
-
-    # save GDK_..._SCALE if they are already set
-    if [ -n "$GDK_SCALE" ]; then
-        GDK_SCALE_OLD=$GDK_SCALE
-    fi
-    if [ -n "$GDK_DPI_SCALE" ]; then
-        GDK_SCALE_DPI_OLD=$GDK_DPI_SCALE
-    fi
-
-    cat ~/.gtk-3-scale
-    notify-send $(cat ~/.gtk-3-scale)
-    source ~/.gtk-3-scale
-
-
-    # run the application
-    "$@"
-
-    # restore previous variables
-    if [ -n "$GDK_SCALE_OLD" ]; then
-        export GDK_SCALE=$GDK_SCALE_OLD
-    else
-        unset GDK_SCALE
-    fi
-    if [ -n "$GDK_DPI_SCALE" ]; then
-        export GDK_SCALE_DPI=$GDK_DPI_SCALE_OLD
-    else
-        unset GDK_DPI_SCALE
-    fi
-}
-alias eclipse='gtk_application_with_dpi_scaling eclipse'
-alias inkscape='gtk_application_with_dpi_scaling inkscape'
+# scaling script and alias to ~/.local/lib and ~/.local/bin for dmenu

@@ -10,6 +10,7 @@ Usage:
             -b          Bit rate, passed to scrcpy (default: 2M)
             -a          IP address of device (default: digitalpaper.local)
             -p          Port (default: 5555)
+            -l          Use cable connection over USB (default uses wifi)
 
             Anything else will be passed to scrcpy.
 "
@@ -19,13 +20,17 @@ resolution=1920
 bit_rate=2M
 ip_addr=$(avahi-resolve --name digitalpaper.local | awk '{print $2}')
 port=5555
+# from adb devices
+serial=324650005033174
 
+use_local=
 
+local_exist=$(adb devices | grep "$serial")
 
 PASSED=()
 # See here for the "hm:b:a:p:" syntax:
 # https://www3.physnet.uni-hamburg.de/physnet/Tru64-Unix/HTML/MAN/MAN1/0221____.HTM
-while getopts "hm:b:a:p:" flag;
+while getopts "hm:b:a:p:l" flag;
 do
     case "$flag" in
         h)
@@ -44,17 +49,33 @@ do
         p)
             port="$OPTARG"
             ;;
+        l)
+            use_local=1
+            ;;
     esac
 done
 # shift by the number of collected keyward args
 # this leaves $@ with all remaining parameters afterwards
 shift $((OPTIND-1))
 
-echo $(which scrcpy)
+if [ -z "$use_local" ];
+then
+    s="$ip_addr":"$port"
+else
+    if [ -z "$local_exist" ]; then
+        echo "ERROR: Can't use device with -l, device does not exist
+        (check adb devices)"
+        exit 0
+    else
+        s="$serial"
+    fi
+fi
+
 cmd="scrcpy \
 -m $resolution \
 -b $bit_rate \
--s $ip_addr:$port \
+-s $s \
+-n \
 $@"
 
 # echo command

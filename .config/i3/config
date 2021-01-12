@@ -166,8 +166,10 @@ bindsym $mod+l			focus right
 bindsym $mod+$alt+l		focus output right
 bindsym $mod+Shift+l		move right 30
 
-bindsym $mod+z			gaps outer current plus 5
-bindsym $mod+Shift+z		gaps outer current minus 5
+#bindsym $mod+z			gaps outer current plus 5
+#bindsym $mod+Shift+z		gaps outer current minus 5
+bindsym $mod+z			gaps horizontal current plus 20
+bindsym $mod+Shift+z		gaps horizontal current minus 20
 
 bindsym $mod+x			exec --no-startup-id mpc pause; exec --no-startup-id pauseallmpv ; exec --no-startup-id i3lock -e -f -c 1d2021
 bindsym $mod+Shift+x		exec --no-startup-id prompt "Shutdown computer?" "$shutdown"
@@ -175,8 +177,10 @@ bindsym $mod+Shift+x		exec --no-startup-id prompt "Shutdown computer?" "$shutdow
 bindsym $mod+c			exec --no-startup-id cabl
 bindsym $mod+Shift+c		exec --no-startup-id camtoggle
 
-bindsym $mod+v			exec --no-startup-id $term -e $EDITOR -c "VimwikiIndex"
-#bindsym $mod+Shift+v
+#bindsym $mod+v			exec --no-startup-id $term -e $EDITOR -c "VimwikiIndex"
+# vertical gaps: centering windows for large screens
+bindsym $mod+v			gaps vertical current plus 5
+bindsym $mod+Shift+v		gaps vertical current minus 5
 
 bindsym $mod+b			bar mode toggle
 bindsym $mod+Shift+b		floating toggle; sticky toggle; exec --no-startup-id bottomleft
@@ -343,7 +347,9 @@ bindsym $mod+F8		exec --no-startup-id ~/.config/mutt/etc/mailsync.sh
 bindsym $mod+F9		exec --no-startup-id dmenumount
 bindsym $mod+F10	exec --no-startup-id dmenuumount
 bindsym $mod+F11	exec --no-startup-id ducksearch
-bindsym $mod+F12	exec $term -e nmtui
+#bindsym $mod+F12	exec $term -e nmtui
+# set gaps for large screen width
+bindsym $mod+F12 	gaps horizontal current set 500; gaps vertical current set 20
 
 # #---Arrow Keys---# #
 bindsym $mod+Left		focus left

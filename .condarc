@@ -38,3 +38,20 @@ channels:
 #   True or False. True is now an alias to 'flexible'.
 #
 channel_priority: strict
+
+# create_default_packages (sequence: primitive)
+#   env var string delimiter: ','
+#   Packages that are by default added to a newly created environments.
+#
+create_default_packages:
+  - mamba
+  - ipython
+  - ipykernel
+  - pylint
+  - flake8
+
+# pip_interop_enabled (bool)
+#   Allow the conda solver to interact with non-conda-installed python
+#   packages.
+#
+pip_interop_enabled: True

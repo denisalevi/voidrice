@@ -1,0 +1,6 @@
+#!/bin/sh
+# Find all PYthon files in subdirectories and open them with (neo)VIm (fimpy)
+# Command line arguments are passed to fd command
+
+bgcolor_nvim $(fd -e py "$@")
+

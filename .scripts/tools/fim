@@ -1,0 +1,9 @@
+#!/bin/sh
+# fim: Find all files with a specific extension and ofen them in neo(VIm)
+# Command line arguments are passed as extensions
+#   Example:
+#       To open all .py files, run `fim py`
+#       To open all .py and all .cu files, run `fim py cu`
+
+fd $(printf " -e %s" "$@") -X bgcolor_nvim
+

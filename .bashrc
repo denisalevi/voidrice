@@ -22,6 +22,9 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/opt/cuda
 # wal setup (https://github.com/dylanaraps/pywal/wiki/Getting-Started)
 (cat ~/.cache/wal/sequences &)
 source ~/.cache/wal/colors-tty.sh
+# added this to set LS_COLORS, which fd needs for colored output
+source ~/.cache/wal/colors.sh
 
 # tab-completion for tmuxp
 eval "$(_TMUXP_COMPLETE=source tmuxp)"
+

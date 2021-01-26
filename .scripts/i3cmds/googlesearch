@@ -8,15 +8,17 @@ browser=${BROWSER:-firefox}
 
 pgrep -x dmenu && exit
 
-choice=$(echo "🦆" | dmenu -i -p "Search Google:") || exit 1
+choice=$(printf "Google\nDuckDuckGo" | dmenu -i -p "Search Google:") || exit 1
 
-if [ "$choice" = "🔍"  ]; then
+if [ "$choice" = "Google"  ]; then
     $browser "https://google.com"
+elif [ "$choice" = "DuckDuckGo"  ]; then
+    $browser "https://duckduckgo.com"
 else
     # Detect if url
     if [[ "$choice" =~ ^(http:\/\/|https:\/\/)?[a-zA-Z0-9]+\.[a-zA-Z]+(/)?.*$ ]]; then
         $browser "$choice"
     else
-        $browser "https://duckduckgo.com/?q=$choice&t=ffab&atb=v1-1"
+        $browser "https://www.google.com/search?q=$choice"
     fi
 fi

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Gives a dmenu prompt to search Google.
+# Without input, will open google.com.
+# URLs will be directly handed to the browser.
+# Anything else, it search it.
+browser=${BROWSER:-firefox}
+
+pgrep -x dmenu && exit
+
+choice=$(echo "🦆" | dmenu -i -p "Search Google:") || exit 1
+
+if [ "$choice" = "🔍"  ]; then
+    $browser "https://google.com"
+else
+    # Detect if url
+    if [[ "$choice" =~ ^(http:\/\/|https:\/\/)?[a-zA-Z0-9]+\.[a-zA-Z]+(/)?.*$ ]]; then
+        $browser "$choice"
+    else
+        $browser "https://duckduckgo.com/?q=$choice&t=ffab&atb=v1-1"
+    fi
+fi

@@ -48,7 +48,7 @@ alias ka="killall" \
 eval "$(thefuck --alias)"
 
 # Use neovim for vim if present and use nvim script that checks wal bg color
-command -v nvim >/dev/null && alias nvim='bgcolor_nvim' vim="nvim" vimdiff="nvim -d"
+command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d"
 
 shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o http.*pdf) ;}
 se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}

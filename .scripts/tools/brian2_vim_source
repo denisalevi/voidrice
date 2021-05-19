@@ -1,8 +1,20 @@
 #!/bin/bash
 # Load all brian2 source files
-# Exclude folders with -E in `fd`
+# If called without arguments, load Session.vim in brian2 directory
+# If calles with argument 'new', load all py, cpp and h files and recreate
+# Session.vim
+
+# Session.vim is automatically updated by vim-obsession
 
 cd ~/projects/brian2cuda/brian2cuda_repository/frozen_repos/brian2
 
 # use bgcolor_nvim which load correct bg color set with wal
-bgcolor_nvim $(fd -e py -e cpp -e h)
+if [ "$1" == "new" ]; then
+    nvim $(fd -e py -e cpp -e h)
+elif [ ! -z "$1" ]; then
+    echo "Only argument accepted is 'new', got $1"
+    exit 1
+else
+    echo "Loading Session.vim"
+    nvim
+fi

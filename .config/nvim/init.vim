@@ -1067,9 +1067,106 @@ def CreateGithubLink():
     #      NOTE: WORD is limited by spaces, word depends on iskeyword option
     vim.command(f"normal ciW{new_word}")
 
+
+def set_brian_pythonpath():
+    import os
+    import subprocess
+    import shlex
+    import pathlib
+    import vim
+
+    git_root = subprocess.check_output(
+        shlex.split(f"git rev-parse --show-toplevel"),
+        encoding='UTF-8'
+    ).rstrip()
+    worktree_dir = '~/projects/brian2cuda/brian2cuda_repository/worktrees'
+    pythonpath = ""
+    if pathlib.PurePath(git_root).is_relative_to(worktree_dir):
+        dirs = os.listdir(git_root)
+        if 'brian2cuda' in dirs:
+            b2c_dir = git_root
+            brian2_dir = os.path.join(git_root, "frozen_repos", "brian2")
+            if 'brian2' not in os.listdir(brian2_dir):
+                print(f"WARNING {brian2_dir} is not initialized.")
+                brian2_dir = None
+        elif 'brian2' in dirs:
+            brian2_dir = git_root
+            b2c_dir = os.path.join(git_root, '..', '..')
+            if 'brian2cuda' not in os.listdir(b2c_dir):
+                b2c_dir = None
+
+        pythonpath = ""
+        if brian2_dir is not None or b2c_dir is not None:
+            paths = []
+            if brian2_dir is not None:
+                paths.append(f"{brian2_dir}")
+            if b2c_dir is not None:
+                paths.append(f"{b2c_dir}")
+            pythonpath = "PYTHONPATH=" + ':'.join(paths) + ":$PYTHONPATH"
+
+    vim.command(f'let pythonpath = "{pythonpath}"')
+
+def set_brian_pythonpath():
+    import os
+    import subprocess
+    import shlex
+    import pathlib
+    import vim
+
+    git_root = os.path.realpath(
+        subprocess.check_output(
+            shlex.split(f"git rev-parse --show-toplevel"),
+            encoding='UTF-8'
+        )
+    ).rstrip()
+    worktree_dir = os.path.realpath(
+        os.path.expanduser(
+            '~/projects/brian2cuda/brian2cuda_repository/worktrees'
+        )
+    )
+    pythonpath = ""
+    vim.command('if exists("g:pythonpath") | unlet g:pythonpath | endif')
+    if pathlib.PurePath(git_root).is_relative_to(worktree_dir):
+        print("B")
+        dirs = os.listdir(git_root)
+        if 'brian2cuda' in dirs:
+            b2c_dir = git_root
+            brian2_dir = os.path.join(git_root, "frozen_repos", "brian2")
+            if 'brian2' not in os.listdir(brian2_dir):
+                print(f"WARNING {brian2_dir} is not initialized.")
+                brian2_dir = None
+        elif 'brian2' in dirs:
+            brian2_dir = git_root
+            b2c_dir = os.path.join(git_root, '..', '..')
+            if 'brian2cuda' not in os.listdir(b2c_dir):
+                b2c_dir = None
+
+        if brian2_dir is not None or b2c_dir is not None:
+            paths = []
+            if brian2_dir is not None:
+                paths.append(f"{brian2_dir}")
+            if b2c_dir is not None:
+                paths.append(f"{b2c_dir}")
+            pythonpath = "PYTHONPATH=" + ':'.join(paths) + ":$PYTHONPATH"
+            print("C")
+
+        vim.command(f'let g:pythonpath = "{pythonpath}"')
+
 ENDPY
 
   " ----- Vimscript Functions {{{2
+
+  "  Set PYTHONPATH when inside brian2cuda directory
+  function! RunPythonAsync()
+python3 << ENDPY
+set_brian_pythonpath()
+ENDPY
+    if exists("g:pythonpath")
+      execute "AsyncRun -raw " . g:pythonpath . " python %"
+    else
+      execute "AsyncRun -raw python %"
+    endif
+  endfunction
 
   " Remember last curser position in file
   function RememberLastPosition()

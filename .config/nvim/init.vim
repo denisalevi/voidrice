@@ -28,7 +28,7 @@
   "Plug 'xolox/vim-easytags'
   Plug 'ludovicchabant/vim-gutentags'
   "Plug 'vim-scripts/TagHighlight'
-  Plug 'majutsushi/tagbar'
+  "Plug 'majutsushi/tagbar'
   Plug 'ctrlpvim/ctrlp.vim'
   Plug 'FelikZ/ctrlp-py-matcher'
   Plug '/usr/bin/fzf'
@@ -45,6 +45,8 @@
   " `sudo npm -g install instant-markdown-d`, see github install instructions
   " or better use pacman AUR script (see system setup notes)
   Plug 'suan/vim-instant-markdown', {'for': 'markdown'}
+  " rst file viewer
+  Plug 'Rykka/InstantRst'
   " Make tabular looking stuff in vim (alignment etc.), check out vimcast
   Plug 'godlygeek/tabular'
   Plug 'plasticboy/vim-markdown'
@@ -97,7 +99,7 @@
   "Plug 'lazywei/vim-matlab'
   Plug 'yinflying/matlab.vim'
   " support for R code (including execution)
-  Plug 'jalvesaq/Nvim-R', {'branch': 'stable'}
+  "Plug 'jalvesaq/Nvim-R', {'branch': 'stable'}
 
   " ----- man pages, tmux ------------------------------------------ {{{2
   Plug 'jez/vim-superman'
@@ -146,7 +148,7 @@
   "  \ 'do': 'bash install.sh',
   "  \ }
   " Asynchronous linting/fixing for Vim and Language Server Protocol (LSP) integration
-  Plug 'dense-analysis/ale'
+  "Plug 'dense-analysis/ale'
   " async make (disabled sinc it does the same as ale?
   " Plug 'neomake/neomake'
   " async execution of external commands
@@ -162,9 +164,8 @@
   "Plug 'tmhedberg/SimpylFold'
   "Syntax checking
   " TODO neomake (automatic make while modfying file)
-  " TODO conda plugin?
-  " plugin for vim and conda env, test it! Only little attention at github
-  "Plugin 'cjrh/vim-conda'
+  " XXX: This gives super slow vim startup times when an env is active already...
+  "Plug 'cjrh/vim-conda'
 
   call plug#end()
 
@@ -402,7 +403,7 @@
   " ----- vim-airline/vim-airline settings  {{{2
   " Always show statusbar
   set laststatus=2
-  set showtabline=2
+  set showtabline=1  " Set to 2 if using tabline extension
   " dont show INSERT / VISUAL in statusline (shown by powerline already)
   "set noshowmode
 
@@ -413,14 +414,16 @@
   let g:airline_detect_paste=1
 
   " Show airline for tabs too
-  let g:airline#extensions#tabline#enabled = 1
+  " > Disabled this since it slows down vim many tabs...
+  "let g:airline#extensions#tabline#enabled = 1
 
   " Show vim-obsession status
   let g:airline#extensions#obsession#enabled = 1
   "let g:airline#extensions#obsession#indicator_text = ''
 
   " Show just the filename
-  let g:airline#extensions#tabline#fnamemod = ':t'
+  " > Makes only sense if tabline is used, else full path is fine
+  "let g:airline#extensions#tabline#fnamemod = ':t'
 
   " Use the solarized theme for the Airline status bar
   let g:airline_theme='gruvbox'
@@ -534,6 +537,9 @@
   endif
 
   " ----- 'w0rp/ale' {{{2
+  " Disable ALE by default
+  let g:ale_enables = 0
+
   let g:ale_fixers = {
   \   '*': ['remove_trailing_lines', 'trim_whitespace'],
   \   'python': ['black'],
@@ -577,7 +583,10 @@
   " endif
 
   " ----- skywind3000/asyncrun.vim {{{2
-  autocmd FileType python nmap <leader>o :AsyncRun -raw python %<CR>
+  " <leader>o -> Load brian2cuda and brian2 from current directory
+  autocmd FileType python nmap <leader>o :call RunPythonAsync()<CR>
+  " <leader>O -> Don't load anything, just run current Python env
+  autocmd FileType python nmap <leader>O :AsyncRun -raw python %<CR>
   autocmd FileType matlab nmap <leader>o :AsyncRun matlab -batch %:r<CR>
   autocmd BufEnter *.m compiler mlint
   " automatically open quick-fix window with 6 lines
@@ -594,7 +603,7 @@
   " Use the nearest .git directory as the cwd
   " This makes a lot of sense if you are working on a project that is in
   " version control. It also supports works with .svn, .hg, .bzr.
-  let g:ctrlp_working_path_mode = 'r'
+  let g:ctrlp_working_path_mode = 'ra'
 	" cache the file indexing
 	let g:ctrlp_cache_dir = $HOME . '/.cache/ctrlp'
 	" use ag (faster)
@@ -610,7 +619,7 @@
   let g:ctrlp_user_command = ['.git/', 'git --git-dir=%s/.git ls-files -oc --exclude-standard']
 	" Setup some default ignores
 	let g:ctrlp_custom_ignore = {
-				\ 'dir':  '\v[\/](\.(git|hg|svn)|\_site)$',
+				\ 'dir':  '\v[\/](\.(git|hg|svn)|\_site|\/home\/denis)$',
 				\ 'file': '\v\.(exe|so|dll|class|png|jpg|jpeg)$',
 				\}
   " faster match function ('FelikZ/ctrlp-py-matcher')
@@ -867,6 +876,9 @@
 
 
 " ----- Keyboard Mappings {{{1
+
+  " 'cjrh/vim-conda'
+  map <leader>E :CondaChangeEnv<CR>
 
   " shortcuts to open config files, taken from ~/.config/shortcutrc
   nmap <leader>cbf :e ~/.config/bmfiles<CR>
@@ -1161,10 +1173,52 @@ ENDPY
 python3 << ENDPY
 set_brian_pythonpath()
 ENDPY
+
+    " Detect if buffer is inside a Python module and execute it via module specification
+    " to allow executing module files with relative imports
+    "
+    " Example:
+    "   pwd -> /absolute/path/to/dir
+    "   expand('%') -> relative/path/to/file.py
+    "
+    "   full path of buffer is then
+    "   expand('%:p') -> /absolute/path/to/dir/relative/path/to/file.py
+    "
+    "   and we want to execute it via
+    "     python -m relative.path.to.file
+    "
+    " Test if open buffer is inside a Python module
+    " (has an __init__.py file in same directory; expand('%:h') -> /relative/path/to)
+    if !empty(glob(expand('%:h').'/__init__.py'))
+      " buffer is inside a module
+      " now test if pwd is the first directory outside the module, i.e. pwd is not a
+      " Python module (no __init__.py) and ./relative is one (has __init__.py)
+      " Get the first folder in expand('%') by removing everything after the first /
+      " g:module_dir = relative
+      let g:module_dir = substitute(expand('%'), '\(.\{-}\)/.*', '\1', '')
+      " Now test for the __init__.py files
+      if empty(glob('__init__.py')) && !empty(glob(g:module_dir . '/__init__.py'))
+        " pwd is not a module and realtive is a module
+        " Now get the correct expression for python -m <g:module_path>
+        " substitute all / with . in buffer path (without extension, :r)
+        " relative/path/to/file.py -> relative.path.to.file
+        let g:module_path = substitute(expand('%:r'), '/', '.', 'g')
+      endif
+    endif
+
+    " By default, just execute buffer with python
+    "   python relative/path/to/file.py
+    let g:python_argument = "%"
+    if exists("g:module_path")
+      " Use module specification:
+      "   python -m relative.path.to.file
+      let g:python_argument = "-m " . g:module_path
+    endif
+
     if exists("g:pythonpath")
-      execute "AsyncRun -raw " . g:pythonpath . " python %"
+      execute "AsyncRun -raw " . g:pythonpath . " python " . g:python_argument
     else
-      execute "AsyncRun -raw python %"
+      execute "AsyncRun -raw python " . g:python_argument
     endif
   endfunction
 
@@ -1232,6 +1286,10 @@ ENDPY
 
   command! -nargs=1 Prof call MyProf(<f-args>)
 
+  " Tex formatexpr for one line per sentence
+  function! MyFormatExpr(start, end)
+    silent execute a:start.','.a:end.'s/[.!?]\zs /\r/g'
+  endfunction
 
 " ----- Autocommands (indentation settings) {{{1
   " Indention stuff
@@ -1245,7 +1303,7 @@ ENDPY
     autocmd FileType make               set tabstop=8 shiftwidth=8 noexpandtab list
     autocmd FileType man                set tabstop=8 shiftwidth=8 noexpandtab
     autocmd FileType c,cpp,cuda         set tabstop=4 shiftwidth=4 softtabstop=4 textwidth=79 expandtab nolist
-    autocmd FileType tex                set tabstop=2 shiftwidth=2 textwidth=79 wrap expandtab iskeyword+=: "linebreak
+    autocmd FileType tex                set tabstop=2 shiftwidth=2 wrap expandtab iskeyword+=: formatexpr=MyFormatExpr(v:lnum,v:lnum+v:count-1) linebreak "textwidth=79 
     autocmd FileType tex,markdown,gitcommit,vimwiki,mail  setlocal spell spelllang=en_us
     "autocmd FileType plaintex,tex,latex syntax spell toplevel
     "autocmd FileType tex                set makeprg=pdflatex\ \"%\"&&evince\ \"%<.pdf\"

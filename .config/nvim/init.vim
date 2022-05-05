@@ -77,7 +77,8 @@
   " TODO do I need the indent vim?
   "X Plug 'vim-scripts/indentpython.vim'
   Plug 'Vimjas/vim-python-pep8-indent'
-  Plug 'denisalevi/vim-pydocstring'
+  "Plug 'denisalevi/vim-pydocstring'
+  Plug 'heavenshell/vim-pydocstring', { 'do': 'make install', 'for': 'python' }
   " Use either syntastic + flake8 isntalled or vim-flake8
   "Plug 'vim-syntastic/syntastic'
   " TODO: check out w0rp/ale for asynchronous checking
@@ -898,6 +899,8 @@
 
   " Pydocstring
   nmap <leader>z <Plug>(pydocstring)
+  nmap <leader>Z :PydocstringFormat<CR>
+  let g:pydocstring_formatter = 'numpy'
 
   " ----- jmcantrell/vim-diffchanges  {{{2
   " show the changes made to the saved file

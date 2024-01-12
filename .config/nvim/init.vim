@@ -40,7 +40,8 @@
   Plug 'tpope/vim-unimpaired'
   " show changes to saved file using vimdiff
   Plug 'jmcantrell/vim-diffchanges'
-  Plug 'sjl/gundo.vim'  " XXX needs python2
+  "Plug 'sjl/gundo.vim'  " XXX needs python2
+  Plug 'simnalamburt/vim-mundo'  " Fork of gundo
   " markdown preview, needs npm installed and instand-markdown-d
   " `sudo npm -g install instant-markdown-d`, see github install instructions
   " or better use pacman AUR script (see system setup notes)
@@ -58,10 +59,14 @@
   " Hide ANSI sequences (there is a more up to date version here:
   " http://www.drchip.org/astronaut/vim/index.html#ANSIESC
   Plug 'powerman/vim-plugin-AnsiEsc'
+  Plug 'github/copilot.vim'
 
   " ----- Working with Git ----------------------------------------- {{{2
   Plug 'airblade/vim-gitgutter'
   Plug 'tpope/vim-fugitive'
+  " Allow working with symlinks in vim
+  Plug 'aymericbeaumet/vim-symlink'
+  Plug 'moll/vim-bbye' " optional dependency
 
   " ---- Other stuff without own section --------------------------- {{{2
   " automatic closing of brackets
@@ -132,6 +137,7 @@
   "Plug 'digitaltoad/vim-jade'
   "Plug 'tpope/vim-liquid'
   "Plug 'cakebaker/scss-syntax.vim'
+  Plug 'anufrievroman/vim-angry-reviewer'
 
   " ------ My old stuff --------------------------------------------- {{{2
   "DirDiff directory diff
@@ -150,10 +156,12 @@
   "  \ }
   " Asynchronous linting/fixing for Vim and Language Server Protocol (LSP) integration
   "Plug 'dense-analysis/ale'
+  Plug 'psf/black', { 'branch': 'stable' }
   " async make (disabled sinc it does the same as ale?
   " Plug 'neomake/neomake'
   " async execution of external commands
   Plug 'skywind3000/asyncrun.vim'
+  Plug 'preservim/vimux'
   " Smart Pthon Syntax
   "Plug 'numirias/semshi', {'do': ':UpdateRemotePlugins'}
 
@@ -227,6 +235,9 @@
   set foldnestmax=1                       " only fold up to one level deep
   set nospell
   set formatoptions-=t                     " turn off automatic line breaks
+  " Enable persistent undo so that undo history persists across vim sessions
+  set undofile
+  set undodir=~/.vim/undo
   autocmd FileType txt, markdown set formatoptions+=t " turn automatic line breaks on for text files
 
   if has("nvim")
@@ -246,6 +257,7 @@
     autocmd BufWinLeave ?* mkview 1
     autocmd BufWinEnter ?* silent! loadview 1
   augroup END
+  set nofoldenable                        " disable folding by default
 
 " " OmniComplete
 " if has("autocmd") && exists("+omnifunc")
@@ -282,6 +294,9 @@
 
 
 " ----- Plugin-Specific Settings {{{1
+
+  " 'anufrievroman/vim-angry-reviewer'
+  let g:AngryReviewerEnglish = 'american'
 
   " vimroom
   " Replace the end of buffer ~ signs with space (there should be a white
@@ -715,6 +730,8 @@
   let g:gutentags_exclude_project_root = ['/usr/local', '~']
   " create tagfiles for brian2 generated projects
   let g:gutentags_project_root = ['code_objects']
+  " put tag files in cache dir
+  let g:gutentags_cache_dir = '~/.cache/gutentags'
   " print TAGS in statusline when gutentags is generating
   set statusline+=%{gutentags#statusline()}
 
@@ -841,6 +858,11 @@
   " Never Forget, To set the default viewer:: Very Important
   let g:Tex_ViewRule_pdf = 'zathura'
 
+  " disable folding
+  let g:Tex_FoldedSections=""
+  let g:Tex_FoldedEnvironments=""
+  let g:Tex_FoldedMisc=""
+
   " Trying to add same for pdfs, hoping that package SynTex is installed
   "let g:Tex_CompileRule_dvi = 'latex -src-specials -interaction=nonstopmode $*'
   let g:Tex_CompileRule_pdf = 'pdflatex -synctex=1 -interaction=nonstopmode $*'
@@ -911,8 +933,8 @@
   " Syntax checking
   nnoremap <F7> :SyntasticCheck<CR>
 
-  " Toggle undo tree (sjl/gundo)
-  nnoremap <leader>u :GundoToggle<CR>
+  " Toggle undo tree (simnalamburt/vim-mundo)
+  nnoremap <leader>u :MundoToggle<CR>
 
   " Open/close NERDTree tabs (Mirror only opens Tree in current tab)
   "nmap <leader>e :NERDTreeTabsToggle<CR>
@@ -949,11 +971,11 @@
   set pastetoggle=<F2>
 
   " Update ctags
-  augroup keybinding
-    au!
-    autocmd FileType c,cpp,cuda         map <F8> :!/usr/bin/ctags -R --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
-    "autocmd FileType cuda               map <F8> :!/usr/bin/ctags -R --langmap=c++:+.cu --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
-  augroup END
+  "augroup keybinding
+  "  au!
+  "  autocmd FileType c,cpp,cuda         map <F8> :!/usr/bin/ctags -R --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
+  "  "autocmd FileType cuda               map <F8> :!/usr/bin/ctags -R --langmap=c++:+.cu --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
+  "augroup END
 
   " Switch btwn dark and light theme solarized
   "call togglebg#map("<F9>")
@@ -1219,9 +1241,10 @@ ENDPY
     endif
 
     if exists("g:pythonpath")
-      execute "AsyncRun -raw " . g:pythonpath . " python " . g:python_argument
+      " This uses CPU threads 0-7 (P-CPUs on my system)
+      execute "AsyncRun -raw -mode=term -pos=tmux taskset -c 0,1,2,3,4,5,6,7" . g:pythonpath . " python " . g:python_argument
     else
-      execute "AsyncRun -raw python " . g:python_argument
+      execute "AsyncRun -raw -mode=term -pos=tmux taskset -c 0,1,2,3,4,5,6,7 python " . g:python_argument
     endif
   endfunction
 
@@ -1306,7 +1329,7 @@ ENDPY
     autocmd FileType make               set tabstop=8 shiftwidth=8 noexpandtab list
     autocmd FileType man                set tabstop=8 shiftwidth=8 noexpandtab
     autocmd FileType c,cpp,cuda         set tabstop=4 shiftwidth=4 softtabstop=4 textwidth=79 expandtab nolist
-    autocmd FileType tex                set tabstop=2 shiftwidth=2 wrap expandtab iskeyword+=: formatexpr=MyFormatExpr(v:lnum,v:lnum+v:count-1) linebreak "textwidth=79 
+    autocmd FileType tex                set tabstop=2 shiftwidth=2 wrap expandtab iskeyword+=: formatexpr=MyFormatExpr(v:lnum,v:lnum+v:count-1) linebreak nofoldenable "textwidth=79
     autocmd FileType tex,markdown,gitcommit,vimwiki,mail  setlocal spell spelllang=en_us
     "autocmd FileType plaintex,tex,latex syntax spell toplevel
     "autocmd FileType tex                set makeprg=pdflatex\ \"%\"&&evince\ \"%<.pdf\"

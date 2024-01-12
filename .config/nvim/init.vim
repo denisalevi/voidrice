@@ -240,6 +240,9 @@
   set undodir=~/.vim/undo
   autocmd FileType txt, markdown set formatoptions+=t " turn automatic line breaks on for text files
 
+  " Read documents directory from xdg user dir config
+  let g:documents_dir=substitute(system('xdg-user-dir DOCUMENTS'), '\n', '', 'g')
+
   if has("nvim")
     " use system python as python provider for neovim plugins
     let g:python3_host_prog = '/usr/bin/python3'
@@ -377,7 +380,7 @@
 
 
   " ----- xolox/vim-notes  {{{2
-  let g:notes_directories = ['~/documents/notes/vim-notes']
+  let g:notes_directories = [g:documents_dir . '/notes/vim-notes']
   let g:notes_suffix = '.txt'
 	" open files created with vim-notes plugin as correct filetype
 	for notes_dir in g:notes_directories
@@ -716,7 +719,7 @@
           \ , 'sro':'&&&'
           \ , 'kind2scope':{'h':'header'}
           \ , 'sort':0
-          \ , 'ctagsbin':'~/documents/notes/vimwiki/vwtags.py'
+          \ , 'ctagsbin':g:documents_dir . '/notes/vimwiki/vwtags.py'
           \ , 'ctagsargs': 'markdown'
           \ }
 
@@ -795,7 +798,7 @@
   let g:instant_markdown_logfile = '/tmp/instant_markdown.log'
 
   " ----- vimwiki/vimwiki {{{2
-  let g:vimwiki_list = [{'path': '~/documents/notes/vimwiki/',
+  let g:vimwiki_list = [{'path': g:documents_dir . '/notes/vimwiki/',
         \ 'syntax': 'markdown', 'ext': '.md'},
         \ {'path': '~/git/sprekelerlab/wiki.wiki/',
         \ 'syntax': 'markdown', 'ext': '.md'},

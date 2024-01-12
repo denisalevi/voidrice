@@ -15,6 +15,17 @@
 
 ### SCALING CONFIGS
 ##############################################################
+config_1k = {
+    # GDK 3 (GTK 3) icon scaling
+    # GDK_SCALE only takes integers, so stay at 100%
+    'GDK_SCALE': 1,
+    'GDK_DPI_SCALE': 1,
+    # Firefox
+    'layout.css.devPixelsPerPx': 1,
+    # Xressources
+    'Xft.dpi': 96  # 100%
+}
+
 # Thinkpad T480 screen, 150% scaling
 config_2k = {
     # GDK 3 (GTK 3) icon scaling
@@ -44,8 +55,8 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Set screen DPI scaling")
 parser.add_argument('resolution', type=int, #choices=['2k', '4k'],
-                    help=("Set the screen resolution. 2 and 4 are interpreted as "
-                          "2000 and 4000."))
+                    help=("Set the screen resolution. 1, 2 and 4 are interpreted as "
+                          "1000, 2000 and 4000."))
 args = parser.parse_args()
 
 import subprocess
@@ -62,7 +73,9 @@ def report(message, error=False, **kwargs):
                     f'--urgency={urgency}', message],
                    **kwargs)
 
-if args.resolution == 2:
+if args.resolution == 1:
+    k = 1
+elif args.resolution == 2:
     k = 2
 elif args.resolution == 4:
     k = 4
@@ -71,12 +84,14 @@ elif args.resolution < 2900:
 elif args.resolution > 3800:
     k = 4
 
-if k == 2:
+if k == 1:
+    config = config_1k
+elif k == 2:
     config = config_2k
 elif k == 4:
     config = config_4k
 else:
-    msg = f"Only 2k and 4k display configs are available, got {args.resolution}"
+    msg = f"Only 1k, 2k and 4k display configs are available, got {args.resolution}"
     report(msg, error=True)
     raise NotImplementedError(msg)
 

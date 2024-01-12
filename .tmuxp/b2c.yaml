@@ -10,7 +10,7 @@ windows:
   - focus: 'true'
     shell_command:
     - conda activate b2c
-    - ~/.scripts/tools/brian2_vim_source
+    - brian2_vim_source
   window_name: brian
 - layout: c43e,136x74,0,0,1
   start_directory: ~/projects/brian2cuda/brian2cuda_repository/
@@ -20,7 +20,7 @@ windows:
   - focus: 'true'
     shell_command:
     - conda activate b2c
-    - ~/.scripts/tools/b2c_vim_source
+    - b2c_vim_source
   window_name: b2c
 - focus: 'true'
   layout: c43f,136x74,0,0,2
@@ -28,8 +28,8 @@ windows:
     automatic-rename: 'off'
   panes:
   - focus: 'true'
-    shell_command: bash
-  start_directory: /home/denis/tubcloud/home/projects/brian2cuda/dev
+    shell_command: zsh
+  start_directory: ~/projects/brian2cuda/dev
   window_name: terminal
 - layout: c440,136x74,0,0,3
   options:
@@ -46,7 +46,7 @@ windows:
   panes:
   - focus: 'true'
     shell_command: nvim index.md
-  start_directory: /home/denis/tubcloud/home/projects/brian2cuda/brian2cuda-wiki
+  start_directory: ~/projects/brian2cuda/brian2cuda-wiki
   window_name: wiki
   window_index: 8
 - layout: c442,136x74,0,0,5

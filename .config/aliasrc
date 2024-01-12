@@ -34,13 +34,15 @@ alias ka="killall" \
     b2c='conda activate b2c && tmuxp load b2c' \
     ipykernel_install='python -m ipykernel install --user \
         --name "$CONDA_DEFAULT_ENV" --display-name "$CONDA_DEFAULT_ENV"' \
+    conda='micromamba' \
     ca='conda activate' \
+    cda='conda deactivate' \
     lmake='latexmk -jobname=output -pdflatex="pdflatex -file-line-error \
         -shell-escape -synctex=1 -interaction=nonstopmode" -bibtex -pdf' \
     lmakep='lmake -pvc' \
     lc='latexmk -c' \
     lC='latexmk -C' \
-    notes='cd ~/documents/notes/vimwiki && vim index.md' \
+    notes='cd ~/Documents/notes/vimwiki && vim index.md' \
     b2cwiki='cd ~/projects/brian2cuda/brian2cuda-wiki && vim index.md' \
     sprekelerlab_wiki='cd ~/git/sprekelerlab/wiki.wiki && vim index.md' \
     dptrp1='dptrp1 --addr digitalpaper.local'

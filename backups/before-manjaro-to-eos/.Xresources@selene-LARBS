@@ -1,0 +1,5 @@
+! scaling, applied to i3 (for Firefox change `layout.css.devPixelsPerPx` in about:config)
+Xft.dpi: 140
+! font options and transparency for st
+*.font:  Liberation Mono:pixelsize=24:antialias=true:autohint=true;
+*.alpha: 255

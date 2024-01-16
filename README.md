@@ -1,4 +1,17 @@
-# Luke's GNU/Linux Dotfiles
+# Denis' dotfiles
+
+Eli Schwarz Dotfiles script
+`yay -S dotfiles.sh-git`
+
+These are my dotfiles, which originated from Luke Smith's LARBS install a couple of years ago.
+
+## Dotfile management
+The repo could be used as a git repo in $HOME. But for now I use
+[dotbot](https://github.com/anishathalye/dotbot?tab=readme-ov-file#getting-started).
+Just install via `yay -S dotbot` or via `pip`. Then run `dotbot -c
+/path/to/dotbot.conf.yaml` to install the dotfiles.
+
+# Old README from Luke's GNU/Linux Dotfiles
 
 These are my dotfiles! The name of the repo, "voidrice", came from the fact they were originally on my Void Linux machine, but these files are distro-independent. In fact, I now push changes from my X200 running Parabola or my X220 running Arch.
 

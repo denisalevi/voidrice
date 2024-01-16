@@ -1,5 +1,8 @@
 # Directory of Scripts
 
+XXX: Denis: I moved everything from .scripts into .local/bin (similar to voidrice upstream)
+     But the information here might still be useful
+
 I keep all my user-created scripts here in `~/.scripts/`.  Scripts are sorted
 into sub-directories for easy management, and all are seamlessly added to
 `$PATH` with the command below in `~/.profile`:

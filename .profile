@@ -1,8 +1,7 @@
 #!/bin/sh
 # Profile file. Runs on login.
 
-# Adds `~/.scripts` and all subdirectories to $PATH
-export PATH="$PATH:$(du "$HOME/.scripts/" | cut -f2 | tr '\n' ':' | sed 's/:*$//')"
+export PATH="$HOME/.local/bin:$PATH"
 export EDITOR="bgcolor_nvim"
 export VISUAL="bgcolor_nvim"
 export TERMINAL="st"
@@ -10,9 +9,9 @@ export BROWSER="firefox"
 export ALTBROWSER="chromium"
 export READER="zathura"
 export FILE="vu"
-export BIB="$HOME/Documents/LaTeX/uni.bib"
-export REFER="$HOME/Documents/referbib"
-export SUDO_ASKPASS="$HOME/.scripts/tools/dmenupass"
+export BIB="$HOME/$(xdg-user-dir DOCUMENTS)/LaTeX/uni.bib"
+export REFER="$HOME/$(xdg-user-dir DOCUMENTS)/referbib"
+export SUDO_ASKPASS="$HOME/.local/bin/dmenupass"
 export NOTMUCH_CONFIG="$HOME/.config/notmuch-config"
 export GTK2_RC_FILES="$HOME/.config/gtk-2.0/gtkrc-2.0"
 
@@ -34,7 +33,8 @@ echo "$0" | grep "bash$" >/dev/null && [ -f ~/.bashrc ] && source "$HOME/.bashrc
 [ "$(tty)" = "/dev/tty1" ] && ! pgrep -x i3 >/dev/null && exec startx
 
 # Set caps to excape if tty:
-sudo -n loadkeys ~/.scripts/ttymaps.kmap 2>/dev/null
+# Denis: It's all handled in ~/.local/bin/remaps now
+#sudo -n loadkeys ~/.local/share/ttymaps.kmap 2>/dev/null
 
 # zsh like implementation of precmd: sends bell alarm after command execution
 # in TMUX

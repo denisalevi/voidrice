@@ -1,14 +1,14 @@
 # You can add comments to these files with #
 h	~/
-d	~/Documents
-D	~/Downloads
+d	~/$(xdg-user-dir DOCUMENTS)
+D	~/$(xdg-user-dir DOWNLOADS)
 m	~/Music
 pp	~/Pictures
 vv	~/Videos
 cf	~/.config
 sc	~/.scripts
 mn	/mnt
-vni 	~/documents/notes/vim-notes/.images
-vwi 	~/documents/notes/vimwiki/images
-mhbf 	~/documents/teaching/mhbf/2019-WS
+vni 	~/$(xdg-user-dir DOCUMENTS)/notes/vim-notes/.images
+vwi 	~/$(xdg-user-dir DOCUMENTS)/notes/vimwiki/images
+mhbf 	~/$(xdg-user-dir DOCUMENTS)/teaching/mhbf/2019-WS
 dro 	~/projects/drosophila_consolidation

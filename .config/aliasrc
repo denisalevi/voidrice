@@ -1,4 +1,5 @@
 #!/bin/sh
+
 alias ka="killall" \
 	mpv="mpv --input-ipc-server=/tmp/mpvsoc$(date +%s)" \
 	calcurse="calcurse -D ~/.config/calcurse" \
@@ -42,7 +43,7 @@ alias ka="killall" \
     lmakep='lmake -pvc' \
     lc='latexmk -c' \
     lC='latexmk -C' \
-    notes='cd ~/Documents/notes/vimwiki && vim index.md' \
+    notes="cd ~/$(xdg-user-dir DOCUMENTS)/notes/vimwiki && vim index.md" \
     b2cwiki='cd ~/projects/brian2cuda/brian2cuda-wiki && vim index.md' \
     sprekelerlab_wiki='cd ~/git/sprekelerlab/wiki.wiki && vim index.md' \
     dptrp1='dptrp1 --addr digitalpaper.local'
@@ -53,6 +54,7 @@ eval "$(thefuck --alias)"
 command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d"
 
 shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o http.*pdf) ;}
+# XXX: Does this need some change since executables are now all in .local/bin instead of .scripts
 se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
 sv() { vcopy "$(du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf)" ;}
 vf() { fzf | xargs -r -I % $EDITOR % ;}

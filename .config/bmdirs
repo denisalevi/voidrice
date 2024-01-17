@@ -6,7 +6,6 @@ m	~/Music
 pp	~/Pictures
 vv	~/Videos
 cf	~/.config
-sc	~/.scripts
 mn	/mnt
 vni 	~/$(xdg-user-dir DOCUMENTS)/notes/vim-notes/.images
 vwi 	~/$(xdg-user-dir DOCUMENTS)/notes/vimwiki/images

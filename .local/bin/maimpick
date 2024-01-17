@@ -51,7 +51,7 @@ case $selection in
         dptrp1_screenshot /tmp/dptrp1-screenshot.png
         if [ $? = 0 ]
         then
-            sxiv -f /tmp/dptrp1-screenshot.png &
+            nsxiv -f /tmp/dptrp1-screenshot.png &
             PROC_ID="$!"
             maim -s | xclip -selection clipboard -t image/png
             kill $PROC_ID
@@ -65,7 +65,7 @@ case $selection in
         dptrp1_screenshot /tmp/dptrp1-screenshot.png
         if [ $? = 0 ]
         then
-            sxiv -f /tmp/dptrp1-screenshot.png &
+            nsxiv -f /tmp/dptrp1-screenshot.png &
             PROC_ID="$!"
             maim -s "$filepath"
             kill $PROC_ID
@@ -87,7 +87,7 @@ if [ -n "$filepath" ]; then
     filename=$(basename -- "$filepath")
     extension="${filename##*.}"
 
-    # XXX: check ~/.config/sxiv/exec/key-handler for how to pass directories from bmdirs
+    # XXX: check ~/.config/nsxiv/exec/key-handler for how to pass directories from bmdirs
     rm_leading_spaces='s/^[[:space:]]*//'
     vimwiki_img_dir="~/documents/notes/vimwiki/images"
     # ~/documents/notes/vim-notes/.images

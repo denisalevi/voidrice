@@ -3,4 +3,9 @@
 # using wal
 # Previously, I just used an alias nvim="bgcolor_nvim", but this breaks
 # tmux-resurrect, which only works for `nvim` commands
-~/.scripts/tools/bgcolor_nvim "$@"
+#
+#~/.local/bin/bgcolor_nvim "$@"
+#
+# XXX: wal not installed currently, that setup was for LARBS. If not needed,
+# remove this file
+/usr/bin/nvim "$@"

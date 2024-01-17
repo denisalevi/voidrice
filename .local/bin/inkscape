@@ -1,5 +1,0 @@
-#!/bin/bash
-# Run with correct DPI scaling
-#source ~/.local/lib/hidpi_utils
-#gtk_application_with_dpi_scaling /usr/bin/inkscape
-echo "CHECK IF GTK SCALING NEEDED in ~/.local/bin/inkscape"

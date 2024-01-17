@@ -1,4 +1,0 @@
-#!/bin/sh
-# select 100 most recently syncronized mirrors from Germany, using https
-# protocol, sort them by download speed and store in mirrorlist
-sudo reflector --country Germany --protocol https --verbose --latest 100 --sort rate --save /etc/pacman.d/mirrorlist

@@ -1,9 +1,0 @@
-bf	~/.config/bmfiles
-bd	~/.config/bmdirs
-cfb	~/.bashrc
-cfa	~/.config/aliasrc
-cfz	~/.zshrc
-cfv	~/.config/nvim/init.vim
-cfi	~/.config/i3/config
-cfm	~/.config/mutt/muttrc
-cv	~/git/CV/cv.tex

@@ -1,1 +1,79 @@
-/home/denis/git/voidrice/.config/aliasrc
+#!/bin/sh
+alias ka="killall" \
+	mpv="mpv --input-ipc-server=/tmp/mpvsoc$(date +%s)" \
+	calcurse="calcurse -D ~/.config/calcurse" \
+	magit="nvim -c Magit" \
+	p="sudo pacman" \
+	SS="sudo systemctl" \
+	f="vifm" \
+	g="git" \
+	trem="transmission-remote" \
+	e="$EDITOR" \
+	v="$EDITOR" \
+	x="sxiv -ft *" \
+	sdn="sudo shutdown -h now" \
+	gua="git remote | xargs -L1 git push --all" \
+	ls="ls -hN --color=auto --group-directories-first" \
+    ll="ls -al" \
+    la="ls -A" \
+    l="ls -l" \
+    lll="ls -latr" \
+	grep="grep --color=auto" \
+	diff="diff --color=auto" \
+	ccat="highlight --out-format=ansi" \
+	yt="youtube-dl --add-metadata -i -o '%(upload_date)s-%(title)s.%(ext)s'" \
+	yta="yt -x -f bestaudio/best" \
+	YT="youtube-viewer" \
+	ref="shortcuts >/dev/null; source ~/.config/shortcutrc" \
+	upc="sudo pacman -Syu; pkill -RTMIN+8 i3blocks" \
+	lsp="pacman -Qett --color=always | less" \
+	ffmpeg="ffmpeg -hide_banner" \
+	sudo="sudo " \
+    vim_b2c='b2c_vim_source' \
+    vim_brian='brian2_vim_source' \
+    b2c='conda activate b2c && tmuxp load b2c' \
+    ipykernel_install='python -m ipykernel install --user \
+        --name "$CONDA_DEFAULT_ENV" --display-name "$CONDA_DEFAULT_ENV"' \
+    conda='micromamba' \
+    ca='conda activate' \
+    cda='conda deactivate' \
+    lmake='latexmk -jobname=output -pdflatex="pdflatex -file-line-error \
+        -shell-escape -synctex=1 -interaction=nonstopmode" -bibtex -pdf' \
+    lmakep='lmake -pvc' \
+    lc='latexmk -c' \
+    lC='latexmk -C' \
+    notes='cd ~/Documents/notes/vimwiki && vim index.md' \
+    b2cwiki='cd ~/projects/brian2cuda/brian2cuda-wiki && vim index.md' \
+    sprekelerlab_wiki='cd ~/git/sprekelerlab/wiki.wiki && vim index.md' \
+    dptrp1='dptrp1 --addr digitalpaper.local'
+
+eval "$(thefuck --alias)"
+
+# Use neovim for vim if present and use nvim script that checks wal bg color
+command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d"
+
+shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o http.*pdf) ;}
+se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
+sv() { vcopy "$(du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf)" ;}
+vf() { fzf | xargs -r -I % $EDITOR % ;}
+
+
+vimcluster() {
+    # Open file on cluster remote using vim netrw plugin
+    # Usage:
+    #   vimcluster $1 $2 ...
+    #       where arguments are the paths relative to current directory
+    #       arguments can be . but .. does not work
+    new_args=()
+    to_remove="tubcloud/home/"
+    remote_pwd=${PWD//$to_remove/}
+    for arg in "$@"
+    do
+        new_arg="scp://cluster//cognition/$remote_pwd/$arg"
+        # remove trailing dot to open current directory (dot does not work)
+        new_arg=${new_arg%"."}
+        new_args+=( $new_arg )
+    done
+    echo "Executing: vim ${new_args[@]}"
+    vim ${new_args[@]}
+}

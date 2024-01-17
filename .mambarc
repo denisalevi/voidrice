@@ -1,0 +1,12 @@
+channels:
+  - conda-forge
+
+pip_interop_enabled: True
+
+create_default_packages:
+  #- mamba
+  - ipython
+  - ipykernel
+  #- pylint
+  #- flake8
+

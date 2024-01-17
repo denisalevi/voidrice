@@ -3,7 +3,7 @@
 1. Clone [my fork](https://github.com/denisalevi/dotfiles.sh) of `dotfiles.sh` from Eli Schwarz.
   ```
   mkdir ~/git
-  git clone https://github.com/denisalevi/dotfiles.sh.git ~/git/dotfiles.sh
+  git clone git@github.com:denisalevi/dotfiles.sh.git ~/git/dotfiles.sh
   ```
 2. Install `dotfiles.sh`:
    - Arch: `cd ~/git/dotfiles.sh && makepkg -sri`

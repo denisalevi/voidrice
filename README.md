@@ -1,9 +1,19 @@
 # Denis' dotfiles
 
-Eli Schwarz Dotfiles script
-`yay -S dotfiles.sh-git`
-
-These are my dotfiles, which originated from Luke Smith's LARBS install a couple of years ago.
+1. Clone [my fork](https://github.com/denisalevi/dotfiles.sh) of `dotfiles.sh` from Eli Schwarz.
+  ```
+  mkdir ~/git
+  git clone https://github.com/denisalevi/dotfiles.sh.git ~/git/dotfiles.sh
+  ```
+2. Install `dotfiles.sh`:
+   - Arch: `cd ~/git/dotfiles.sh && makepkg -sri`
+   - Other distros: `cd ~/git/dotfiles.sh && make install` (or probably `sudo make install`)
+3. Clone this dotfiles repo using the `dotfiles` command installed by `dotfiles.sh`
+   ```
+   dotfiles clone git@github.com:denisalevi/voidrice.git ~/git/dotfiles
+   ```
+   - This clones this dotfiles repo as bare git repository into `~/git/dotfiles` and sets its working directory to `~`. It also takes care of doing a spasce checkout (`README`, `LICENCE`, `.gitignore`, `.gitattributes` are not checked out, avoiding cluttering of `$HOME`). To use git commands on the config files in `$HOME`, use `dotfiles` instead of `git`. Run `dotfiles --help` or read the README in [dotfiles.sh](https://github.com/denisalevi/dotfiles.sh) for additional commands implemented by `dotfiles`.
+   - My fork of `dotfiles.sh` adds this feature: During the `dotfiles clone` command, any configuration files already present on the system are commited to a local `backup-before-clone` branch and are then replaced with any config files in the `~/git/dotfiles` repository (`master` branch). If you want to compare the two, open `nvim`, install all plugins with `:PlugInstall` and open a diff view of the dotfiles repository via `:DiffviewOpen backup-before-clone`.
 
 ## Dotfile management
 The repo could be used as a git repo in $HOME. But for now I use

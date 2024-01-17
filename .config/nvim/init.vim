@@ -40,6 +40,8 @@
   Plug 'tpope/vim-unimpaired'
   " show changes to saved file using vimdiff
   Plug 'jmcantrell/vim-diffchanges'
+  Plug 'nvim-tree/nvim-web-devicons'
+  Plug 'sindrets/diffview.nvim'
   "Plug 'sjl/gundo.vim'  " XXX needs python2
   Plug 'simnalamburt/vim-mundo'  " Fork of gundo
   " markdown preview, needs npm installed and instand-markdown-d

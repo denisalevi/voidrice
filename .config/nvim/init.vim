@@ -300,7 +300,34 @@
 
 " ----- Plugin-Specific Settings {{{1
 
-  " 'anufrievroman/vim-angry-reviewer'
+  " tpope/vim-fugitive {{{2
+  " Add support for bare dotfiles repo with working tree in $HOME
+  " Adapted from https://github.com/tpope/vim-fugitive/discussions/1656#discussioncomment-6616748
+  augroup dotfiles
+    autocmd VimEnter * call InitDotfileRepo()
+    autocmd BufReadPost * call InitDotfileRepo(bufnr(''))
+  augroup END
+
+  function InitDotfileRepo(...)
+    " Get user home directory
+    let user_home = fnamemodify($HOME, ':p')
+    let dotfile_dir = $HOME
+    let dotfile_repo = $HOME . '/git/dotfiles'
+
+    " Did fugitive detect a git repo? Then do nothing
+    if (len(FugitiveGitDir()))
+      return
+    endif
+
+    " Else check if we are in the dotfile worktree
+    let path = fnamemodify(a:0 ? bufname(a:1) : getcwd(), ':p:h')
+    let dotfile_len = len(dotfile_dir)
+    if (len(path) >= dotfile_len && path[0:dotfile_len - 1] ==# dotfile_dir)
+      call FugitiveDetect(dotfile_repo)
+    endif
+  endfunction
+
+  " 'anufrievroman/vim-angry-reviewer' {{{2
   let g:AngryReviewerEnglish = 'american'
 
   " vimroom

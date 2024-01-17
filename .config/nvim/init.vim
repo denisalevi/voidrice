@@ -310,9 +310,8 @@
 
   function InitDotfileRepo(...)
     " Get user home directory
-    let user_home = fnamemodify($HOME, ':p')
-    let dotfile_dir = $HOME
-    let dotfile_repo = $HOME . '/git/dotfiles'
+    let dotfile_dir = expand($HOME)
+    let dotfile_repo = expand($HOME . '/git/dotfiles')
 
     " Did fugitive detect a git repo? Then do nothing
     if (len(FugitiveGitDir()))
@@ -324,6 +323,12 @@
     let dotfile_len = len(dotfile_dir)
     if (len(path) >= dotfile_len && path[0:dotfile_len - 1] ==# dotfile_dir)
       call FugitiveDetect(dotfile_repo)
+      " And modify GIT environment variable such that diffview.nvim works as
+      " well
+      " (https://github.com/sindrets/diffview.nvim/issues/163#issuecomment-1165048677)
+      " Set environment variables
+      let $GIT_WORK_TREE = dotfile_dir
+      let $GIT_DIR = dotfile_repo
     endif
   endfunction
 

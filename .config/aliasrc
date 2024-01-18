@@ -29,6 +29,7 @@ alias ka="killall" \
 	upc="sudo pacman -Syu; pkill -RTMIN+8 i3blocks" \
 	lsp="pacman -Qett --color=always | less" \
 	ffmpeg="ffmpeg -hide_banner" \
+    # If last character of alias is space, check next word for alias (allows aliases to be used with sudo)
 	sudo="sudo " \
     vim_b2c='b2c_vim_source' \
     vim_brian='brian2_vim_source' \
@@ -55,27 +56,27 @@ command -v nvim >/dev/null && alias vim="nvim" vimdiff="nvim -d"
 
 shdl() { curl -O $(curl -s http://sci-hub.tw/"$@" | grep location.href | grep -o http.*pdf) ;}
 # XXX: Does this need some change since executables are now all in .local/bin instead of .scripts
-se() { du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
-sv() { vcopy "$(du -a ~/.scripts/* ~/.config/* | awk '{print $2}' | fzf)" ;}
+se() { du -a ~/.local/bin/* ~/.local/lib/* ~/.config/* | awk '{print $2}' | fzf | xargs  -r $EDITOR ;}
+sv() { vcopy "$(du -a ~/.local/bin/* ~/.local/bin/* ~/.config/* | awk '{print $2}' | fzf)" ;}
 vf() { fzf | xargs -r -I % $EDITOR % ;}
 
 
-vimcluster() {
-    # Open file on cluster remote using vim netrw plugin
-    # Usage:
-    #   vimcluster $1 $2 ...
-    #       where arguments are the paths relative to current directory
-    #       arguments can be . but .. does not work
-    new_args=()
-    to_remove="tubcloud/home/"
-    remote_pwd=${PWD//$to_remove/}
-    for arg in "$@"
-    do
-        new_arg="scp://cluster//cognition/$remote_pwd/$arg"
-        # remove trailing dot to open current directory (dot does not work)
-        new_arg=${new_arg%"."}
-        new_args+=( $new_arg )
-    done
-    echo "Executing: vim ${new_args[@]}"
-    vim ${new_args[@]}
-}
+#vimcluster() {
+#    # Open file on cluster remote using vim netrw plugin
+#    # Usage:
+#    #   vimcluster $1 $2 ...
+#    #       where arguments are the paths relative to current directory
+#    #       arguments can be . but .. does not work
+#    new_args=()
+#    to_remove="tubcloud/home/"
+#    remote_pwd=${PWD//$to_remove/}
+#    for arg in "$@"
+#    do
+#        new_arg="scp://cluster//cognition/$remote_pwd/$arg"
+#        # remove trailing dot to open current directory (dot does not work)
+#        new_arg=${new_arg%"."}
+#        new_args+=( $new_arg )
+#    done
+#    echo "Executing: vim ${new_args[@]}"
+#    vim ${new_args[@]}
+#}

@@ -4,15 +4,13 @@
 export PATH="$HOME/.local/bin:$PATH"
 export EDITOR="bgcolor_nvim"
 export VISUAL="bgcolor_nvim"
-export TERMINAL="st"
-export BROWSER="firefox"
-export ALTBROWSER="chromium"
+export TERMINAL="xfce4-terminal"
+export BROWSER="chromium"
+export ALTBROWSER="firefox"
 export READER="zathura"
-export FILE="vu"
-export BIB="$HOME/$(xdg-user-dir DOCUMENTS)/LaTeX/uni.bib"
-export REFER="$HOME/$(xdg-user-dir DOCUMENTS)/referbib"
+export FILE="thunar"
 export SUDO_ASKPASS="$HOME/.local/bin/dmenupass"
-export NOTMUCH_CONFIG="$HOME/.config/notmuch-config"
+#export NOTMUCH_CONFIG="$HOME/.config/notmuch-config"
 export GTK2_RC_FILES="$HOME/.config/gtk-2.0/gtkrc-2.0"
 
 # less/man colors
@@ -50,4 +48,4 @@ then
     }
 fi
 
-# scaling script and alias to ~/.local/lib and ~/.local/bin for dmenu
+# Moved scaling script and alias to ~/.local/lib and ~/.local/bin for dmenu

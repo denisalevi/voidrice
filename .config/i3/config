@@ -380,6 +380,9 @@ exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 #exec --no-startup-id dex -a -s /etc/xdg/autostart/:~/.config/autostart/
 exec --no-startup-id dex --autostart --environment i3
 
+# Denis: Start remapd to automatically run remaps when devices are plugged in
+exec --no-startup-id dex --autostart --environment ~/.local/bin/remapd
+
 # start welcome app
 #exec --no-startup-id sh /usr/share/endeavouros/scripts/welcome --startdelay=3 
 

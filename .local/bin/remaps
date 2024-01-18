@@ -4,9 +4,14 @@
 setxkbmap -option
 # Increase key speed via a rate change
 xset r rate 300 50
+# Turn of CAPS lock if activated
+caps_lock_status=$(xset -q | sed -n 's/^.*Caps Lock:\s*\(\S*\).*$/\1/p')
+if [ $caps_lock_status == "on" ]; then
+  xdotool key Caps_Lock
+fi
 # Map the caps lock key to control...
 setxkbmap -layout "us,de" -option "grp:rctrl_switch,caps:ctrl_modifier"
 # But when it is pressed only once, treat it as escape.
 killall xcape 2>/dev/null ; xcape -e 'Caps_Lock=Escape'
 # Map the menu button (btwn right Alt and Ctrl) to CAPS
-xmodmap -e 'keycode 135 = Caps_Lock'
+#xmodmap -e 'keycode 135 = Caps_Lock'

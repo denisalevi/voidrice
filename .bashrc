@@ -86,6 +86,16 @@ alias ef='_open_files_for_editing'     # 'ef' opens given file(s) for editing
 # alias pacdiff=eos-pacdiff
 ################################################################################
 
+
+### MERGED FROM LARBS INSTALL (~2019)
+stty -ixon # Disable ctrl-s and ctrl-q.
+HISTSIZE= HISTFILESIZE= # Infinite history.
+#export PS1="\[$(tput bold)\]\[$(tput setaf 1)\][\[$(tput setaf 3)\]\u\[$(tput setaf 2)\]@\[$(tput setaf 4)\]\h \[$(tput setaf 5)\]\W\[$(tput setaf 1)\]]\[$(tput setaf 7)\]\\$ \[$(tput sgr0)\]"
+
+[ -f "$HOME/.config/shortcutrc" ] && source "$HOME/.config/shortcutrc" # Load shortcut aliases
+[ -f "$HOME/.config/aliasrc" ] && source "$HOME/.config/aliasrc"
+
+
 ### MERGED FROM MANJARO INSTALL (end of 2022?)
 # commented out most settings, maybe check the shopt settings?
 colors() {
@@ -225,23 +235,31 @@ ex ()
 
 
 ### MANUALLY ADDED
-# Source Denis' aliases
-if [ -f ~/.bash_aliases ]; then
-    . ~/.bash_aliases
-fi
+
+# set XLA_FLAGS for jax to find cuda install
+export XLA_FLAGS=--xla_gpu_cuda_data_dir=/opt/cuda
 
 export PATH="$PATH":~/.local/bin
 export MAMBA_ROOT_PREFIX="~/.conda"
 
+## wal setup (https://github.com/dylanaraps/pywal/wiki/Getting-Started)
+#(cat ~/.cache/wal/sequences &)
+#source ~/.cache/wal/colors-tty.sh
+## added this to set LS_COLORS, which fd needs for colored output
+#source ~/.cache/wal/colors.sh
+
+# tab-completion for tmuxp
+# install python-shtab before tmuxp (via pacman) to get tab completion
+
 # >>> mamba initialize >>>
-# !! Contents within this block are managed by 'mamba init' !!
-export MAMBA_EXE='/usr/bin/micromamba';
-export MAMBA_ROOT_PREFIX='/home/denis/.conda';
-__mamba_setup="$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__mamba_setup"
-else
-    alias micromamba="$MAMBA_EXE"  # Fallback on help from mamba activate
-fi
-unset __mamba_setup
+## !! Contents within this block are managed by 'mamba init' !!
+#export MAMBA_EXE='/usr/bin/micromamba';
+#export MAMBA_ROOT_PREFIX='/home/denis/.conda';
+#__mamba_setup="$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
+#if [ $? -eq 0 ]; then
+#    eval "$__mamba_setup"
+#else
+#    alias micromamba="$MAMBA_EXE"  # Fallback on help from mamba activate
+#fi
+#unset __mamba_setup
 # <<< mamba initialize <<<

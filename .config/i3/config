@@ -302,8 +302,8 @@ bindsym $mod+Shift+p exec ~/.config/i3/scripts/power-profiles
 
 # Define names for default workspaces for which we configure key bindings later on.
 # We use variables to avoid repeating the names in multiple places.
-set $ws1 "2:"
-set $ws2 "1:"
+set $ws1 "1:"
+set $ws2 "2:"
 set $ws3 "3:"
 set $ws4 "4:"
 set $ws5 "5:"
@@ -378,10 +378,44 @@ exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 # if enabled you should comment welcome app.
 # https://github.com/jceb/dex
 #exec --no-startup-id dex -a -s /etc/xdg/autostart/:~/.config/autostart/
-exec --no-startup-id dex --autostart --environment i3
+#exec --no-startup-id dex --autostart --environment i3
 
-# Denis: Start remapd to automatically run remaps when devices are plugged in
-exec --no-startup-id dex --autostart --environment ~/.local/bin/remapd
+# I'm using systemd for autostart instead as described on dex github README
+# To add an application to autostart, define a systemd service unit in ~/.config/systemd/user/ with
+# the following content:
+# --------------------------------------------------
+# [Unit]
+# Description=My Application
+#
+# [Service]
+# ExecStart=%h/.loca./bin/my-application --with --options (%h expands to $HOME)
+# --------------------------------------------------
+#
+# Then reigster the serivce with systemd:
+# systemctl --user add-wants autostart.target <service-name>.service
+#
+# Now all services registered with autostart.target will be started with the command below.
+# One could also just add
+#
+# [Install]
+# WantedBy=default.target
+#
+# to the service file and enable it with systemd. The benefit of using autostart.target is that
+# one can disable all autostart services by commenting out the line below.
+
+# To unregister a autostart service, run
+# systemctl --user disable <service-name>.service
+# To list all running services, run:
+# systemctl --user list-units --type=service
+# To list all failed services, run:
+# systemctl --user --failed
+# To get the status of a service, run:
+# systemctl --user status my-application.service
+# To get the logs of a service, run:
+# journalctl --user-unit my-application.service
+# To get the logs of a service since the last boot, run:
+# journalctl --user-unit my-application.service --boot=-1
+exec --no-startup-id systemctl --user start autostart.target
 
 # start welcome app
 #exec --no-startup-id sh /usr/share/endeavouros/scripts/welcome --startdelay=3 

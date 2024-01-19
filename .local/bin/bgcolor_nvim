@@ -6,16 +6,19 @@
 # wal)
 
 # load $background
-source ~/.cache/wal/colors.sh
+#source ~/.cache/wal/colors.sh
+#
+#if [[ "$background" == "#fbf1c7" ]]; then
+#    BACKGROUND=light
+#elif [[ "$background" == "#282828" ]]; then
+#    BACKGROUND=dark
+#else
+#    BACKGROUND=dark
+#    echo "ERROR in %:vim() : unkown $background colour. Using bg=dark."
+#fi
+#
+## let vim know background
+#env nvim --cmd "let my_terminal_bg = '$BACKGROUND'" "$@"
 
-if [[ "$background" == "#fbf1c7" ]]; then
-    BACKGROUND=light
-elif [[ "$background" == "#282828" ]]; then
-    BACKGROUND=dark
-else
-    BACKGROUND=dark
-    echo "ERROR in %:vim() : unkown $background colour. Using bg=dark."
-fi
-
-# let vim know background
-env nvim --cmd "let my_terminal_bg = '$BACKGROUND'" "$@"
+# wal not installed
+env nvim "$@"

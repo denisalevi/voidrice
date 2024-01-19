@@ -29,7 +29,6 @@ alias ka="killall" \
 	upc="sudo pacman -Syu; pkill -RTMIN+8 i3blocks" \
 	lsp="pacman -Qett --color=always | less" \
 	ffmpeg="ffmpeg -hide_banner" \
-    # If last character of alias is space, check next word for alias (allows aliases to be used with sudo)
 	sudo="sudo " \
     vim_b2c='b2c_vim_source' \
     vim_brian='brian2_vim_source' \
@@ -47,7 +46,16 @@ alias ka="killall" \
     notes="cd ~/$(xdg-user-dir DOCUMENTS)/notes/vimwiki && vim index.md" \
     b2cwiki='cd ~/projects/brian2cuda/brian2cuda-wiki && vim index.md' \
     sprekelerlab_wiki='cd ~/git/sprekelerlab/wiki.wiki && vim index.md' \
-    dptrp1='dptrp1 --addr digitalpaper.local'
+    dptrp1='dptrp1 --addr digitalpaper.local' \
+    dots='dotfiles'
+
+# Needs bash-complete-alias installed from AUR
+source /usr/share/bash-complete-alias/complete_alias
+
+# Propagate completion through aliases
+complete -F _complete_alias dots
+# To propagate for all aliases, use
+# complete -F _complete_alias "${!BASH_ALIASES[@]}"
 
 eval "$(thefuck --alias)"
 

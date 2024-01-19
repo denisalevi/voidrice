@@ -287,9 +287,9 @@ bindsym XF86AudioPrev exec playerctl previous
 bindsym $mod+p exec /usr/local/bin/switch-audio-port
 
 ## App shortcuts
-bindsym $mod+w exec /usr/bin/firefox
+bindsym $mod+w exec /usr/bin/chromium
 bindsym $mod+n exec /usr/bin/thunar
-bindsym Print exec scrot ~/%Y-%m-%d-%T-screenshot.png && notify-send "Screenshot saved to ~/$(date +"%Y-%m-%d-%T")-screenshot.png"
+#bindsym Print exec scrot ~/%Y-%m-%d-%T-screenshot.png && notify-send "Screenshot saved to ~/$(date +"%Y-%m-%d-%T")-screenshot.png"
 # From my prev setup
 bindsym Shift+Print exec --no-startup-id ~/.local/bin/maimpick
 
@@ -323,7 +323,7 @@ set $ws10 "10"
 #workspace $ws5 output HDMI-0
 
 # bind program to workspace and focus to them on startup:
-assign [class="(?i)firefox"] $ws1
+assign [class="(?i)chromium"] $ws1
 assign [class="Xfce4-terminal"] $ws2
 assign [class="Thunar"] $ws3
 assign [class="thunderbird"] $ws4
@@ -331,7 +331,7 @@ assign [class="TelegramDesktop"] $ws5
 
 # automatic set focus new window if it opens on another workspace than the current:
 for_window [class=Xfce4-terminal] focus
-for_window [class=(?i)firefox] focus
+for_window [class=(?i)chromium] focus
 for_window [class=Thunar] focus
 for_window [class=Thunderbird] focus
 for_window [class=TelegramDesktop] focus
@@ -438,7 +438,7 @@ exec --no-startup-id dunst
 
 # Autostart apps as you like
 #exec --no-startup-id sleep 2 && xfce4-terminal
-exec --no-startup-id sleep 7 && firefox https://github.com/endeavouros-team/endeavouros-i3wm-setup/blob/main/force-knowledge.md
+exec --no-startup-id sleep 7 && chromium https://github.com/endeavouros-team/endeavouros-i3wm-setup/blob/main/force-knowledge.md
 #exec --no-startup-id sleep 3 && thunar
 
 ###############

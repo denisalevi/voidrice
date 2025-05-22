@@ -1,0 +1,50 @@
+#!/bin/bash
+
+INTERFACE="$1"
+STATUS="$2"
+SSID="We-dont-have-WiFi"
+CREDENTIALS="/home/denis/.config/homelab/nas_credentials"
+USER="denis"
+
+log() {
+    logger -t mount-nas-smb "$1"
+}
+
+# Only act on wifi interfaces
+if [[ "$INTERFACE" != w* && "$INTERFACE" != wl* ]]; then
+    exit 0
+fi
+
+case "$STATUS" in
+    up)
+        # Get the SSID of the active connection for this interface
+        CUR_SSID=$(nmcli -t -f DEVICE,TYPE,STATE,CONNECTION dev | awk -F: -v iface="$INTERFACE" '$1==iface && $2=="wifi" && $3=="connected"{print $4}')
+        if [[ "$CUR_SSID" == "$SSID" ]]; then
+            if ! mountpoint -q "$MOUNTPOINT"; then
+                MOUNTPOINT="/mnt/nas/media_unsorted"
+                SHARE="//192.168.178.100/Media (unsorted)"
+                log "Mounting SMB share for SSID $SSID on $MOUNTPOINT"
+                mount -t cifs "$SHARE" "$MOUNTPOINT" -o credentials=$CREDENTIALS,uid=$USER,gid=$USER,vers=3.0
+
+                MOUNTPOINT="/mnt/nas/media"
+                SHARE="//192.168.178.100/Media"
+                log "Mounting SMB share for SSID $SSID on $MOUNTPOINT"
+                mount -t cifs "$SHARE" "$MOUNTPOINT" -o credentials=$CREDENTIALS,uid=$USER,gid=$USER,vers=3.0
+            fi
+        fi
+        ;;
+    down)
+        # Unmount if mounted
+        MOUNTPOINT="/mnt/nas/media_unsorted"
+        if mountpoint -q "$MOUNTPOINT"; then
+            log "Unmounting SMB share from $MOUNTPOINT"
+            umount "$MOUNTPOINT"
+        fi
+
+        MOUNTPOINT="/mnt/nas/media"
+        if mountpoint -q "$MOUNTPOINT"; then
+            log "Unmounting SMB share from $MOUNTPOINT"
+            umount "$MOUNTPOINT"
+        fi
+        ;;
+esac

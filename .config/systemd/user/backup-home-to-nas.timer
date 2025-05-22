@@ -1,0 +1,9 @@
+[Unit]
+Description=Run /home/denis to NAS backup once a day
+
+[Timer]
+OnCalendar=*-*-* 18:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

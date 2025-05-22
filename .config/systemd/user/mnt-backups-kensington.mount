@@ -1,0 +1,11 @@
+[Unit]
+Description=Mount USB backup device partition (3rd partition on Kensington pen drive on key chain)
+
+[Mount]
+What=/dev/disk/by-uuid/9617e351-9d4f-43b9-bd22-01f976e37326
+Where=/mnt/backups/kensington
+Type=btrfs
+Options=subvol=/@zelos,defaults,noatime,compress=zstd
+
+[Install]
+WantedBy=multi-user.target

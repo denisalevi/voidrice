@@ -1,0 +1,5 @@
+[Unit]
+Description=Run remapd to trigger remaps whenever input device is connected
+
+[Service]
+ExecStart=%h/.local/bin/remapd

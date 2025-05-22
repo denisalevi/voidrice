@@ -1,0 +1,10 @@
+[Unit]
+Description=Automount USB backup partition
+ConditionPathExists=/mnt/backups/kensington
+
+[Automount]
+Where=/mnt/backups/kensington
+TimeoutIdleSec=10
+
+[Install]
+WantedBy=multi-user.target

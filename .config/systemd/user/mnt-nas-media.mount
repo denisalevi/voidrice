@@ -1,0 +1,12 @@
+# Requires root privileges to mount in /mnt (no user systemd unit)
+[Unit]
+Description=Mount NAS SMB share
+
+[Mount]
+What=//192.168.178.100/Media (unsorted)
+Where=/mnt/nas/media_unsorted
+Type=cifs
+Options=credentials=/home/denis/.config/homelab/nas_credentials,uid=denis,gid=denis,vers=3.0
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Backup /home/denis to NAS with rsync
+
+[Service]
+Type=oneshot
+ExecStart=/home/denis/.local/bin/backup-rsync-nas.sh --quiet

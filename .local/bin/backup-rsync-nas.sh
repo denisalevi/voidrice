@@ -15,6 +15,8 @@ while [[ "$1" =~ ^- ]]; do
     esac
 done
 
+echo "Starting backup script."
+
 FLAG="$HOME/.cache/backup-nas-last-success"
 TODAY=$(date +%F)
 
@@ -29,7 +31,8 @@ if [ "$SSID" = "We-dont-have-WiFi" ]; then
     INFO="--info=name0 --info=flist0 --info=progress2"
     if [ "$QUIET" -eq 1 ]; then
         INFO="--quiet"
-    fi  
+    fi
+    echo "Running backup to NAS at ssh-backups:/mnt/zelos_home/"
     rsync -avz --delete $INFO \
         --exclude='.cache/' \
         --exclude='Downloads/' \
@@ -48,6 +51,7 @@ if [ "$SSID" = "We-dont-have-WiFi" ]; then
     fi
     echo "$TODAY" > "$FLAG"
     notify-send "Backup of /home/denis completed successfully"
+    echo "Backup completed successfully."
     exit 0
 else
     echo "Not on home Wi-Fi, skipping backup."

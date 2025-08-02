@@ -72,7 +72,11 @@ bindsym $mod+Shift+Tab workspace prev
 # switch screen setup
 bindsym $mod+Ctrl+1 exec bash /home/denis/.screenlayout/default.sh
 bindsym $mod+Ctrl+2 exec bash /home/denis/.screenlayout/work.sh
-bindsym $mod+Ctrl+3 exec bash /home/denis/.screenlayout/home.sh
+bindsym $mod+Ctrl+3 exec bash /home/denis/.screenlayout/home-hdmi.sh
+bindsym $mod+Ctrl+4 exec bash /home/denis/.screenlayout/boox.sh
+
+# toggle hiding the bar
+bindsym $mod+b bar mode toggle
 
 # switch to workspace
 bindsym $mod+1    workspace  $ws1
@@ -147,33 +151,39 @@ bindcode $mod+Shift+81 	 move container to workspace  $ws9
 bindcode $mod+Shift+90 	 move container to workspace  $ws10
 
 # resize window (you can also use the mouse for that):
-#mode "resize" {
+mode "resize" {
 # These bindings trigger as soon as you enter the resize mode
 # Pressing left will shrink the window's width.
 # Pressing right will grow the window's width.
 # Pressing up will shrink the window's height.
 # Pressing down will grow the window's height.
-#        bindsym j resize shrink width 10 px or 10 ppt
-#        bindsym k resize grow height 10 px or 10 ppt
-#        bindsym l resize shrink height 10 px or 10 ppt
-#        bindsym ntilde resize grow width 10 px or 10 ppt
+        bindsym j resize shrink width 10 px or 10 ppt
+        bindsym k resize grow height 10 px or 10 ppt
+        bindsym l resize shrink height 10 px or 10 ppt
+        bindsym ntilde resize grow width 10 px or 10 ppt
 
 # same bindings, but for the arrow keys
 #	bindsym Left resize shrink width 10 px or 10 ppt
-#        bindsym Down resize grow height 10 px or 10 ppt
-#        bindsym Up resize shrink height 10 px or 10 ppt
-#        bindsym Right resize grow width 10 px or 10 ppt
+        bindsym Down resize grow height 10 px or 10 ppt
+        bindsym Up resize shrink height 10 px or 10 ppt
+        bindsym Right resize grow width 10 px or 10 ppt
 
 # back to normal: Enter or Escape
 #	bindsym Return mode "default"
-#        bindsym Escape mode "default"
-#}
+        bindsym Escape mode "default"
+}
 
-#bindsym $mod+r mode "resize"
+bindsym $mod+r mode "resize"
 
 ######################################
 # keybindings for different actions: #
 ######################################
+
+# copy emoji
+bindsym $mod+grave exec --no-startup-id dmenuunicode
+
+# lastpass-dmenu (v for vault)
+bindsym $mod+v exec --no-startup-id ~/.local/bin/lpass-dmenu copy
 
 # start a terminal
 bindsym $mod+Return exec xfce4-terminal
@@ -186,9 +196,9 @@ bindsym $mod+Shift+e exec ~/.config/i3/scripts/powermenu
 
 # Lock the system
 # lock with a picture:
-#bindsym $mod+l exec i3lock -i  ~/.config/i3/i3-lock-screen.png -p default|win -t
+#bindsym $mod+x exec i3lock -i  ~/.config/i3/i3-lock-screen.png -p default|win -t
 # lock by blurring the screen:
-bindsym $mod+l exec ~/.config/i3/scripts/blur-lock
+bindsym $mod+x exec ~/.config/i3/scripts/blur-lock
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
@@ -209,11 +219,14 @@ bindsym F1 exec ~/.config/i3/scripts/keyhint-2
 bindsym XF86MonBrightnessUp exec light -A 10 && notify-send "Brightness - $(light | cut -d '.' -f 1)%"
 bindsym XF86MonBrightnessDown exec light -U 10 && notify-send "Brightness - $(light | cut -d '.' -f 1)%"
 
+bindsym Shift+XF86MonBrightnessUp exec light -A 5 && notify-send "Brightness - $(light | cut -d '.' -f 1)%"
+bindsym Shift+XF86MonBrightnessDown exec light -U 5 && notify-send "Brightness - $(light | cut -d '.' -f 1)%"
+
 # change focus
-bindsym $mod+j focus left
-bindsym $mod+k focus down
-bindsym $mod+b focus up
-bindsym $mod+o focus right
+bindsym $mod+j focus down
+bindsym $mod+k focus up
+bindsym $mod+h focus left
+bindsym $mod+l focus right
 
 # alternatively, you can use the cursor keys:
 bindsym $mod+Left focus left
@@ -234,10 +247,10 @@ bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
 # split in horizontal orientation
-bindsym $mod+h split h
+bindsym $mod+Shift+h split h
 
 # split in vertical orientation
-bindsym $mod+v split v
+bindsym $mod+Shift+v split v
 
 # enter fullscreen mode for the focused container
 bindsym $mod+f fullscreen toggle
@@ -254,7 +267,7 @@ bindsym $mod+Shift+space floating toggle
 bindsym $mod+space focus mode_toggle
 
 # focus the parent container
-bindsym $mod+a focus parent
+bindsym $mod+Shift+a focus parent
 
 # open new empty workspace
 bindsym $mod+Shift+n exec ~/.config/i3/scripts/empty_workspace
@@ -292,6 +305,7 @@ bindsym $mod+n exec /usr/bin/thunar
 #bindsym Print exec scrot ~/%Y-%m-%d-%T-screenshot.png && notify-send "Screenshot saved to ~/$(date +"%Y-%m-%d-%T")-screenshot.png"
 # From my prev setup
 bindsym Shift+Print exec --no-startup-id ~/.local/bin/maimpick
+#bindsym Shift+grave exec --no-startup-id ~/.local/bin/maimpick "a selected area (copy)"
 
 # Power Profiles menu switcher (rofi)
 bindsym $mod+Shift+p exec ~/.config/i3/scripts/power-profiles
@@ -306,10 +320,10 @@ set $ws1 "1:"
 set $ws2 "2:"
 set $ws3 "3:"
 set $ws4 "4:"
-set $ws5 "5:"
+set $ws5 "5"
 set $ws6 "6"
 set $ws7 "7"
-set $ws8 "8"
+set $ws8 "8:"
 set $ws9 "9"
 set $ws10 "10"
 
@@ -322,12 +336,37 @@ set $ws10 "10"
 #workspace $ws4 output HDMI-0
 #workspace $ws5 output HDMI-0
 
+#navigate workspaces next / previous
+bindsym $mod+Ctrl+Right workspace next
+bindsym $mod+Ctrl+Left workspace prev
+
+bindsym $mod+Shift+Control+Right	move workspace to output right
+bindsym $mod+Shift+Control+Left	move workspace to output left
+bindsym $mod+Shift+Control+Up	move workspace to output up
+bindsym $mod+Shift+Control+Down	move workspace to output down
+# < key
+#bindsym $mod+comma			focus output left
+#bindsym $mod+Shift+comma		move container to output left; focus output left
+#bindsym $mod+Shift+Control+comma	move workspace to output left
+# > key
+#bindsym $mod+period			focus output right
+#bindsym $mod+Shift+period		move container to output right; focus output right
+#bindsym $mod+Shift+Control+period	move workspace to output right
+# Page Down
+#bindsym $mod+Next			focus output down
+#bindsym $mod+Shift+Next			move container to output down; focus output down
+#bindsym $mod+Shift+Control+Next		move workspace to output down
+# Page Up
+#bindsym $mod+Prior			focus output up
+#bindsym $mod+Shift+Prior		move container to output up; focus output up
+#bindsym $mod+Shift+Control+Prior	move workspace to output up
+
 # bind program to workspace and focus to them on startup:
 assign [class="(?i)chromium"] $ws1
 assign [class="Xfce4-terminal"] $ws2
 assign [class="Thunar"] $ws3
 assign [class="thunderbird"] $ws4
-assign [class="TelegramDesktop"] $ws5
+assign [class="TelegramDesktop"] $ws8
 
 # automatic set focus new window if it opens on another workspace than the current:
 for_window [class=Xfce4-terminal] focus
@@ -431,7 +470,7 @@ exec --no-startup-id systemctl --user start autostart.target
 
 # start a script to setup displays
 # uncomment the next line, use arandr to setup displays and save the file as monitor:
-exec --no-startup-id ~/.screenlayout/monitor.sh
+#exec --no-startup-id ~/.screenlayout/monitor.sh
 
 # set wallpaper
 # exec --no-startup-id sleep 2 && nitrogen --restore
@@ -472,7 +511,7 @@ exec --no-startup-id dunst
 
 # Autostart apps as you like
 #exec --no-startup-id sleep 2 && xfce4-terminal
-exec --no-startup-id sleep 7 && chromium https://github.com/endeavouros-team/endeavouros-i3wm-setup/blob/main/force-knowledge.md
+#exec --no-startup-id sleep 7 && chromium https://github.com/endeavouros-team/endeavouros-i3wm-setup/blob/main/force-knowledge.md
 #exec --no-startup-id sleep 3 && thunar
 
 ###############
@@ -486,6 +525,7 @@ exec --no-startup-id sleep 7 && chromium https://github.com/endeavouros-team/end
 
 # networkmanager-applet
 exec --no-startup-id nm-applet
+exec --no-startup-id blueman-applet
 
 # clipman-applet
 #exec --no-startup-id xfce4-clipman
@@ -551,11 +591,11 @@ client.urgent		    	$urgentred	$urgentred	$white		$yellowbrown	$yellowbrown
 bar {
 		font pango: Noto Sans Regular 10
 		status_command i3blocks -c ~/.config/i3/i3blocks.conf
-	    	position bottom
+	    	position top
 #	    	i3bar_command i3bar --transparency
 # it could be that you have no primary display set: set one (xrandr --output <output> --primary)
 # reference: https://i3wm.org/docs/userguide.html#_tray_output
-		    #tray_output primary
+		    tray_output primary
 		    tray_padding 0
 
 # When strip_workspace_numbers is set to yes,
@@ -636,3 +676,4 @@ bindsym $mod+t exec rofi -show window \
 # Automounting / config of removable drives
 #:exec --no-startup-id udiskie &
 
+bindsym $mod+a exec galculator

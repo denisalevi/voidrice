@@ -42,8 +42,8 @@ alias l='ls -lav --ignore=.?*'   # show long listing but no hidden dotfiles exce
 
 ## Use the up and down arrow keys for finding a command in history
 ## (you can write some initial letters of the command first).
-bind '"\e[A":history-search-backward'
-bind '"\e[B":history-search-forward'
+#bind '"\e[A":history-search-backward'
+#bind '"\e[B":history-search-forward'
 
 ################################################################################
 ## Some generally useful functions.
@@ -89,8 +89,22 @@ alias ef='_open_files_for_editing'     # 'ef' opens given file(s) for editing
 
 ### MERGED FROM LARBS INSTALL (~2019)
 stty -ixon # Disable ctrl-s and ctrl-q.
-HISTSIZE= HISTFILESIZE= # Infinite history.
+#HISTSIZE= HISTFILESIZE= # Infinite history.
 #export PS1="\[$(tput bold)\]\[$(tput setaf 1)\][\[$(tput setaf 3)\]\u\[$(tput setaf 2)\]@\[$(tput setaf 4)\]\h \[$(tput setaf 5)\]\W\[$(tput setaf 1)\]]\[$(tput setaf 7)\]\\$ \[$(tput sgr0)\]"
+
+# Eternal bash history.
+# ---------------------
+# Undocumented feature which sets the size to "unlimited".
+# http://stackoverflow.com/questions/9457233/unlimited-bash-history
+export HISTFILESIZE=
+export HISTSIZE=
+export HISTTIMEFORMAT="[%F %T] "
+# Change the file location because certain bash sessions truncate .bash_history file upon close.
+# http://superuser.com/questions/575479/bash-history-truncated-to-500-lines-on-each-login
+export HISTFILE=~/.bash_eternal_history
+# Force prompt to write history after every command.
+# http://superuser.com/questions/20900/bash-history-loss
+PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
 
 [ -f "$HOME/.config/shortcutrc" ] && source "$HOME/.config/shortcutrc" # Load shortcut aliases
 [ -f "$HOME/.config/aliasrc" ] && source "$HOME/.config/aliasrc"
@@ -226,6 +240,7 @@ ex ()
       *.zip)       unzip $1     ;;
       *.Z)         uncompress $1;;
       *.7z)        7z x $1      ;;
+      *.xz)        unxz $1      ;;
       *)           echo "'$1' cannot be extracted via ex()" ;;
     esac
   else
@@ -242,6 +257,10 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/opt/cuda
 export PATH="$PATH":~/.local/bin
 export MAMBA_ROOT_PREFIX="~/.conda"
 
+export OPENAI_API_KEY="$(cat ~/.config/openai.key)"
+export ANTHROPIC_API_KEY="$(cat ~/.config/anthropic.key)"
+export TAVILY_API_KEY="$(cat ~/.config/tavily.key)"
+
 ## wal setup (https://github.com/dylanaraps/pywal/wiki/Getting-Started)
 #(cat ~/.cache/wal/sequences &)
 #source ~/.cache/wal/colors-tty.sh
@@ -252,14 +271,22 @@ export MAMBA_ROOT_PREFIX="~/.conda"
 # install python-shtab before tmuxp (via pacman) to get tab completion
 
 # >>> mamba initialize >>>
-## !! Contents within this block are managed by 'mamba init' !!
-#export MAMBA_EXE='/usr/bin/micromamba';
-#export MAMBA_ROOT_PREFIX='/home/denis/.conda';
-#__mamba_setup="$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
-#if [ $? -eq 0 ]; then
-#    eval "$__mamba_setup"
-#else
-#    alias micromamba="$MAMBA_EXE"  # Fallback on help from mamba activate
-#fi
-#unset __mamba_setup
+# !! Contents within this block are managed by 'mamba init' !!
+export MAMBA_EXE='/usr/bin/micromamba';
+export MAMBA_ROOT_PREFIX='/home/denis/.conda';
+__mamba_setup="$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__mamba_setup"
+else
+    alias micromamba="$MAMBA_EXE"  # Fallback on help from mamba activate
+fi
+unset __mamba_setup
 # <<< mamba initialize <<<
+
+# ssh-agent, copied from https://wiki.archlinux.org/title/SSH_keys#ssh-agent
+if ! pgrep -u "$USER" ssh-agent > /dev/null; then
+    ssh-agent -t 1h > "$XDG_RUNTIME_DIR/ssh-agent.env"
+fi
+if [[ ! -f "$SSH_AUTH_SOCK" ]]; then
+    source "$XDG_RUNTIME_DIR/ssh-agent.env" >/dev/null
+fi

@@ -183,7 +183,7 @@ bindsym $mod+r mode "resize"
 bindsym $mod+grave exec --no-startup-id dmenuunicode
 
 # lastpass-dmenu (v for vault)
-bindsym $mod+v exec --no-startup-id ~/.local/bin/lpass-dmenu copy
+bindsym $mod+v exec --no-startup-id ~/.local/bin/lastpass-dmenu copy
 
 # start a terminal
 bindsym $mod+Return exec xfce4-terminal

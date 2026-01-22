@@ -5,12 +5,77 @@
 #
 # A battery indicator blocklet script for i3blocks
 
-from subprocess import check_output
+from subprocess import check_output, run
 import os
 import re
+import time
+import json
 
 config = dict(os.environ)
-status = check_output(['acpi'], universal_newlines=True)
+
+def _env_int(name, default):
+    try:
+        return int(config.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+def _cache_state_path():
+    cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(cache_home, "i3blocks", "battery2.notify.json")
+
+def _read_state(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}
+        return data
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+
+def _write_state(path, data):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, sort_keys=True)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+def _notify_send(summary, body, urgency):
+    try:
+        cmd = ["notify-send", "-a", "i3blocks", "-u", urgency, summary]
+        if body:
+            cmd.append(body)
+        run(cmd, check=False)
+    except Exception:
+        pass
+
+def _battery_level(percent, info, warn, crit, emerg):
+    if percent <= 0:
+        return None
+    if emerg and percent <= emerg:
+        return "emerg"
+    if crit and percent <= crit:
+        return "crit"
+    if warn and percent <= warn:
+        return "warn"
+    if info and percent <= info:
+        return "info"
+    return None
+
+def _severity(level):
+    return {"info": 1, "warn": 2, "crit": 3, "emerg": 4}.get(level, 0)
+
+try:
+    status = check_output(["acpi"], universal_newlines=True)
+except Exception:
+    status = ""
+state = None
+timeleft = ""
 
 if not status:
     # stands for no battery found
@@ -26,6 +91,7 @@ else:
     commasplitstatus_batteries=[]
     percentleft_batteries=[]
     time = ""
+    timeleft = ""
     for battery in batteries:
         if battery!='':
             state_batteries.append(battery.split(": ")[1].split(", ")[0])
@@ -102,5 +168,54 @@ else:
 
 print(fulltext)
 print(fulltext)
+
+# Low-battery notifications (anti-spam).
+# Configure via i3blocks env vars in i3blocks.conf, e.g.:
+#   LOW_INFO=0   (disabled)
+#   LOW_WARN=20
+#   LOW_CRIT=10
+#   LOW_EMERG=5
+#   LOW_HYST=5
+#   LOW_RENOTIFY_SECS=900
+if status and state:
+    state_path = _cache_state_path()
+    if state != "Discharging":
+        _write_state(state_path, {"level": None, "when": 0})
+    else:
+        low_info = _env_int("LOW_INFO", 0)
+        low_warn = _env_int("LOW_WARN", 20)
+        low_crit = _env_int("LOW_CRIT", 10)
+        low_emerg = _env_int("LOW_EMERG", 5)
+        low_hyst = _env_int("LOW_HYST", 5)
+        renotify_secs = _env_int("LOW_RENOTIFY_SECS", 900)
+
+        now = int(time.time())
+        prev = _read_state(state_path)
+        prev_level = prev.get("level")
+        prev_when = int(prev.get("when", 0) or 0)
+
+        # Reset notification state when we have recovered above warn (with hysteresis).
+        if percentleft > (low_warn + low_hyst):
+            prev_level = None
+            prev_when = 0
+
+        level = _battery_level(percentleft, low_info, low_warn, low_crit, low_emerg)
+        if level is not None:
+            should_notify = (
+                _severity(level) > _severity(prev_level)
+                or (level == prev_level and (now - prev_when) >= renotify_secs)
+            )
+            if should_notify:
+                urgency = "low" if level == "info" else ("normal" if level == "warn" else "critical")
+                summary = f"Battery {percentleft}% ({state})"
+                body = timeleft[2:-1] if timeleft else ""
+                if body:
+                    body = f"Remaining: {body}"
+                _notify_send(summary, body, urgency)
+                prev_level = level
+                prev_when = now
+
+        _write_state(state_path, {"level": prev_level, "when": prev_when})
+
 if percentleft < 10:
     exit(33)

@@ -23,6 +23,10 @@ def _cache_state_path():
     cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
     return os.path.join(cache_home, "i3blocks", "battery2.notify.json")
 
+def _cache_log_path():
+    cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(cache_home, "i3blocks", "battery2.notify.log")
+
 def _read_state(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -45,14 +49,31 @@ def _write_state(path, data):
     except Exception:
         pass
 
+def _log_line(path, line):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line.rstrip("\n") + "\n")
+    except Exception:
+        pass
+
 def _notify_send(summary, body, urgency):
     try:
         cmd = ["notify-send", "-a", "i3blocks", "-u", urgency, summary]
         if body:
             cmd.append(body)
-        run(cmd, check=False)
+        result = run(cmd, check=False, capture_output=True, text=True)
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            _log_line(
+                _cache_log_path(),
+                f"{int(time.time())} notify-send failed rc={result.returncode} stderr={stderr!r} stdout={stdout!r}",
+            )
+            return False
+        return True
     except Exception:
-        pass
+        return False
 
 def _battery_level(percent, info, warn, crit, emerg):
     if percent <= 0:
@@ -90,19 +111,18 @@ else:
     state_batteries=[]
     commasplitstatus_batteries=[]
     percentleft_batteries=[]
-    time = ""
+    time_raw = ""
     timeleft = ""
     for battery in batteries:
         if battery!='':
             state_batteries.append(battery.split(": ")[1].split(", ")[0])
             commasplitstatus = battery.split(", ")
-            if not time:
-                time = commasplitstatus[-1].strip()
+            if not time_raw:
+                time_raw = commasplitstatus[-1].strip()
                 # check if it matches a time
-                time = re.match(r"(\d+):(\d+)", time)
-                if time:
-                    time = ":".join(time.groups())
-                    timeleft = " ({})".format(time)
+                time_match = re.match(r"(\d+):(\d+)", time_raw)
+                if time_match:
+                    timeleft = " ({})".format(":".join(time_match.groups()))
                 else:
                     timeleft = ""
 
@@ -177,10 +197,11 @@ print(fulltext)
 #   LOW_EMERG=5
 #   LOW_HYST=5
 #   LOW_RENOTIFY_SECS=900
+#   LOW_RETRY_SECS=120
 if status and state:
     state_path = _cache_state_path()
     if state != "Discharging":
-        _write_state(state_path, {"level": None, "when": 0})
+        _write_state(state_path, {"level": None, "when": 0, "attempt_level": None, "attempt_when": 0})
     else:
         low_info = _env_int("LOW_INFO", 0)
         low_warn = _env_int("LOW_WARN", 20)
@@ -188,34 +209,54 @@ if status and state:
         low_emerg = _env_int("LOW_EMERG", 5)
         low_hyst = _env_int("LOW_HYST", 5)
         renotify_secs = _env_int("LOW_RENOTIFY_SECS", 900)
+        retry_secs = _env_int("LOW_RETRY_SECS", 120)
 
         now = int(time.time())
         prev = _read_state(state_path)
         prev_level = prev.get("level")
         prev_when = int(prev.get("when", 0) or 0)
+        prev_attempt_level = prev.get("attempt_level", prev_level)
+        prev_attempt_when = int(prev.get("attempt_when", prev_when) or 0)
 
         # Reset notification state when we have recovered above warn (with hysteresis).
         if percentleft > (low_warn + low_hyst):
             prev_level = None
             prev_when = 0
+            prev_attempt_level = None
+            prev_attempt_when = 0
 
         level = _battery_level(percentleft, low_info, low_warn, low_crit, low_emerg)
         if level is not None:
-            should_notify = (
+            wants_notify = (
                 _severity(level) > _severity(prev_level)
                 or (level == prev_level and (now - prev_when) >= renotify_secs)
             )
-            if should_notify:
+            should_attempt = wants_notify and (
+                _severity(level) > _severity(prev_attempt_level)
+                or (now - prev_attempt_when) >= retry_secs
+            )
+            if should_attempt:
                 urgency = "low" if level == "info" else ("normal" if level == "warn" else "critical")
                 summary = f"Battery {percentleft}% ({state})"
                 body = timeleft[2:-1] if timeleft else ""
                 if body:
                     body = f"Remaining: {body}"
-                _notify_send(summary, body, urgency)
-                prev_level = level
-                prev_when = now
+                ok = _notify_send(summary, body, urgency)
+                prev_attempt_level = level
+                prev_attempt_when = now
+                if ok:
+                    prev_level = level
+                    prev_when = now
 
-        _write_state(state_path, {"level": prev_level, "when": prev_when})
+        _write_state(
+            state_path,
+            {
+                "level": prev_level,
+                "when": prev_when,
+                "attempt_level": prev_attempt_level,
+                "attempt_when": prev_attempt_when,
+            },
+        )
 
 if percentleft < 10:
     exit(33)

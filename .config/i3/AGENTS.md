@@ -2,6 +2,7 @@ This folder contains my i3 configuration.
 
 `config` is the main i3 config.
 `i3blocks.conf` configures the i3blocks status bar.
+`config` uses `status_command i3blocks -c ~/.config/i3/i3blocks.conf` for the bar.
 `keybindings` contains keybinding definitions included by `config`.
 `scripts/` contains i3blocks helper scripts (battery, volume, cpu, etc).
 

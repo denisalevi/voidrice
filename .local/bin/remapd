@@ -1,8 +1,22 @@
 #!/bin/bash
 
-# Rerun the remaps script whenever a new input device is added.
+set -euo pipefail
 
-while :; do
-	~/.local/bin/remaps
-	grep -qP -m1 '[^un]bind.+\/[^:]+\(usb\)' <(udevadm monitor -u -t seat -s input -s usb)
-done
+run_remaps() {
+  ~/.local/bin/remaps
+}
+
+# Apply remaps once at startup, then again whenever a new input-related device
+# is added or rebound. Bluetooth HID reconnects often show up as input/hidraw
+# events instead of the older usb bind pattern this script originally watched.
+run_remaps
+
+udevadm monitor --udev --subsystem-match=input --subsystem-match=hidraw --subsystem-match=usb |
+  while IFS= read -r line; do
+    case "$line" in
+      *" add "*|*" bind "*)
+        sleep 1
+        run_remaps
+        ;;
+    esac
+  done

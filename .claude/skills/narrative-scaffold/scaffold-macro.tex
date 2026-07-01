@@ -1,0 +1,45 @@
+% ============================================================================
+% Narrative scaffolding (drafting workflow)  --  canonical source
+% Bundled with the `narrative-scaffold` skill. Add this block to a repo's
+% preamble (e.g. Preamble/commands.tex, after \usepackage{xcolor}) if the
+% \scaffold macro is not already defined there.
+% ----------------------------------------------------------------------------
+% \scaffold{<topic sentence>}{<body of \sbullet{...} lines>} renders a bold
+% topic sentence with an indented, bulleted plan underneath. It is a DRAFTING
+% aid: you replace each \scaffold with real prose as you write.
+%
+% Toggle: define \scaffolddraft to enable draft rendering. If it is NOT
+% defined (just comment out the \scaffolddrafttrue line, or delete it), any
+% remaining \scaffold raises a hard compile error -- so scaffolding can never
+% silently ship in the final PDF.
+%
+%   \scaffolddrafttrue   % <- draft mode ON; comment this line out for final
+%
+% Bullets: write ONE \sbullet{...} per line inside the second argument.
+% Requires xcolor (for the blue!.. colors). If xcolor is unavailable, drop the
+% \color{...} calls.
+% ============================================================================
+\newif\ifscaffolddraft   % undefined-by-comment => false => hard error below
+\newcommand{\sbullet}[1]{\item #1}
+\newcommand{\scaffold}[2]{%
+  \ifscaffolddraft
+    \par\medskip\noindent
+    {\color{blue!55!black}\textbf{#1}}%
+    \begingroup
+      \color{blue!45!black}%
+      \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}%
+        #2
+      \end{itemize}%
+    \endgroup
+    \par\medskip
+  \else
+    \GenericError{}{%
+      \MessageBreak Unresolved \string\scaffold{} in final build.\MessageBreak
+      Topic sentence: "#1".\MessageBreak
+      Replace it with prose, or enable draft mode (\string\scaffolddrafttrue)%
+    }{}{}%
+  \fi
+}
+% Draft-mode toggle. Comment out the next line for the final build so any
+% leftover \scaffold errors out instead of shipping.
+\scaffolddrafttrue

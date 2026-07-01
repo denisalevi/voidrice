@@ -56,3 +56,10 @@ tmp/
 *.tmp
 
 # Automatically appended
+# Claude Code: runtime state & secrets — never track
+.claude.json
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+.claude/skills/**/__pycache__/
+.mcp.json

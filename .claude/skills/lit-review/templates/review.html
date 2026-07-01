@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<!--
+  lit-review review page — Denis's approval interface.
+  HOW THE SKILL USES THIS TEMPLATE:
+    1. Replace {{REVIEW_NAME}}, {{GENERATED}}, {{SEARCH_LOG}}, {{CREDIT_SPEND}}.
+    2. Replace {{ROWS_NEW}}, {{ROWS_UNCERTAIN}}, {{ROWS_KNOWN}} with <article class="paper"> blocks
+       (see the commented example at the bottom of this file for the exact structure).
+    3. Write to literature-reviews/<review-name>/<review-name>.html.
+  HOW DENIS USES IT:
+    - Open in a browser. For each paper click Add / Discuss / Reject; optionally type a note.
+    - Click "Save decisions" — it writes the choices back into THIS file's data-* attributes AND
+      shows a summary block you can copy. Save the file (Ctrl+S) to persist. Then tell Claude it's ready.
+  HOW THE SKILL READS IT BACK:
+    - Re-read the saved file; each <article class="paper"> has data-decision (add|discuss|reject|none),
+      data-doi, and data-note. Parse those. Only data-decision="add" papers are added to Zotero.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lit-review · {{REVIEW_NAME}}</title>
+<style>
+  :root{--add:#1f883d;--discuss:#9a6700;--reject:#cf222e;--bg:#fff;--fg:#1f2328;--mut:#656d76;--line:#d0d7de;--card:#f6f8fa;}
+  @media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--line:#30363d;--card:#161b22;}}
+  *{box-sizing:border-box}
+  body{font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
+  header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 20px}
+  h1{font-size:19px;margin:0 0 4px}
+  .meta{color:var(--mut);font-size:13px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .bar button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:6px 10px;font-size:13px}
+  .bar button:hover{border-color:var(--mut)}
+  .counts{margin-left:auto;font-size:13px;color:var(--mut)}
+  main{max-width:960px;margin:0 auto;padding:20px}
+  section h2{font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);border-bottom:1px solid var(--line);padding-bottom:6px;margin:28px 0 12px}
+  .paper{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px;background:var(--card)}
+  .paper[data-decision=add]{border-left:4px solid var(--add)}
+  .paper[data-decision=discuss]{border-left:4px solid var(--discuss)}
+  .paper[data-decision=reject]{border-left:4px solid var(--reject);opacity:.7}
+  .ptitle{font-weight:600;font-size:15.5px;margin:0 0 4px}
+  .ptitle a{color:inherit;text-decoration:none;border-bottom:1px dotted var(--mut)}
+  .authors{color:var(--mut);font-size:13px;margin:2px 0}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  .chip{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--mut)}
+  .chip.ok{color:var(--add);border-color:var(--add)}
+  .chip.warn{color:var(--reject);border-color:var(--reject);font-weight:600}
+  details.abs{margin:6px 0}
+  details.abs summary{cursor:pointer;color:var(--mut);font-size:13px}
+  details.abs p{margin:6px 0 0;font-size:13.5px;color:var(--fg)}
+  .choice{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap}
+  .choice button{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:5px 12px;font-size:13px}
+  .choice button.sel[data-c=add]{background:var(--add);color:#fff;border-color:var(--add)}
+  .choice button.sel[data-c=discuss]{background:var(--discuss);color:#fff;border-color:var(--discuss)}
+  .choice button.sel[data-c=reject]{background:var(--reject);color:#fff;border-color:var(--reject)}
+  .note{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);padding:6px 8px;font:13px inherit;resize:vertical;min-height:34px}
+  .known .paper{opacity:.85}
+  #export{white-space:pre-wrap;font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:16px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Literature review · {{REVIEW_NAME}}</h1>
+  <div class="meta">Generated {{GENERATED}} · Sources: {{SEARCH_LOG}} · OpenAlex credits used: {{CREDIT_SPEND}}</div>
+  <div class="bar">
+    <button onclick="setAll('add')">✓ All → Add</button>
+    <button onclick="setAll('reject')">✕ All → Reject</button>
+    <button onclick="setAll('none')">↺ Clear all</button>
+    <button onclick="saveDecisions()"><strong>💾 Save decisions</strong></button>
+    <span class="counts" id="counts"></span>
+  </div>
+</header>
+<main>
+  <section id="new"><h2>New — missing from your Zotero</h2>{{ROWS_NEW}}</section>
+  <section id="uncertain"><h2>Uncertain / possible duplicate — needs your call</h2>{{ROWS_UNCERTAIN}}</section>
+  <section class="known"><h2>Already in your Zotero — context only</h2>{{ROWS_KNOWN}}</section>
+  <pre id="export"></pre>
+</main>
+<script>
+  function papers(){return[...document.querySelectorAll('.paper[data-doi]')]}
+  function choose(el,c){
+    const p=el.closest('.paper');p.dataset.decision=c;
+    p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));
+    updateCounts();
+  }
+  function setAll(c){papers().forEach(p=>{if(!p.closest('.known')){p.dataset.decision=c;
+    p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));}});updateCounts();}
+  function updateCounts(){
+    const c={add:0,discuss:0,reject:0,none:0};
+    papers().forEach(p=>{if(!p.closest('.known'))c[p.dataset.decision||'none']++});
+    document.getElementById('counts').textContent=`add ${c.add} · discuss ${c.discuss} · reject ${c.reject} · undecided ${c.none}`;
+  }
+  function saveDecisions(){
+    // Browsers do NOT persist in-memory DOM edits back to the .html file on Ctrl+S, so we
+    // DOWNLOAD a decisions.json the skill reads back. Robust, no server needed.
+    const decisions=[];
+    papers().forEach(p=>{
+      if(p.closest('.known'))return;
+      const note=p.querySelector('.note');
+      const d=p.dataset.decision||'none';
+      if(d!=='none')decisions.push({decision:d, doi:p.dataset.doi||'', title:(p.querySelector('.ptitle')||{}).textContent||'', note:note?note.value.trim():''});
+    });
+    const payload={review:document.title.replace(/^lit-review · /,''), saved:new Date().toISOString(), decisions};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='decisions.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    const ex=document.getElementById('export');
+    ex.style.display='block';
+    ex.textContent='Downloaded decisions.json ('+decisions.length+' decisions).\n'+
+      '→ Move it into this review folder (next to the .html), then tell Claude it is ready.';
+    ex.scrollIntoView({behavior:'smooth'});
+  }
+  // Restore selection styling from data-decision on load (for re-opened / re-generated files).
+  papers().forEach(p=>{const d=p.dataset.decision;if(d)p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===d));
+    const n=p.querySelector('.note');if(n&&p.dataset.note)n.value=p.dataset.note;});
+  updateCounts();
+</script>
+<!--
+  ROW TEMPLATE — one per paper (New / Uncertain). data-decision starts "none".
+  <article class="paper" data-doi="10.xxxx/yyyy" data-decision="none" data-note="">
+    <div class="ptitle"><a href="https://doi.org/10.xxxx/yyyy" target="_blank">TITLE</a></div>
+    <div class="authors">Author A, Author B, Author C … · YEAR · VENUE</div>
+    <div class="chips">
+      <span class="chip">OpenAlex</span><span class="chip">S2 rec</span>
+      <span class="chip ok">✓ DOI resolves</span>
+      <span class="chip">cited 42×</span>
+      <!-- if retracted: --><span class="chip warn">⚠ RETRACTED</span>
+    </div>
+    <details class="abs"><summary>Abstract</summary><p>ABSTRACT TEXT</p></details>
+    <div class="choice">
+      <button data-c="add"     onclick="choose(this,'add')">Add</button>
+      <button data-c="discuss" onclick="choose(this,'discuss')">Discuss</button>
+      <button data-c="reject"  onclick="choose(this,'reject')">Reject</button>
+    </div>
+    <textarea class="note" placeholder="Note (why / for Zotero / to discuss)…"></textarea>
+  </article>
+  KNOWN-SET rows: same <article class="paper"> but inside <section class="known">, no .choice / .note needed
+  (or include them disabled) — the known section is context only.
+-->
+</body>
+</html>

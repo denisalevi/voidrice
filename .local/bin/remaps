@@ -13,5 +13,15 @@ fi
 setxkbmap -layout "us,de" -option "grp:rctrl_switch,caps:ctrl_modifier"
 # But when it is pressed only once, treat it as escape.
 killall xcape 2>/dev/null ; xcape -e 'Caps_Lock=Escape'
+# Map Logitech MX Vertical thumb buttons: front to Page Up, back to Page Down.
+xbindkeys_config="${XDG_RUNTIME_DIR:-/tmp}/xbindkeys-remaps"
+cat > "$xbindkeys_config" <<'EOF'
+"xdotool key Page_Up"
+  b:8
+
+"xdotool key Page_Down"
+  b:9
+EOF
+killall xbindkeys 2>/dev/null ; xbindkeys -f "$xbindkeys_config"
 # Map the menu button (btwn right Alt and Ctrl) to CAPS
 #xmodmap -e 'keycode 135 = Caps_Lock'

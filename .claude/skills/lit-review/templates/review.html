@@ -54,44 +54,94 @@
   .choice button.sel[data-c=reject]{background:var(--reject);color:#fff;border-color:var(--reject)}
   .note{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);padding:6px 8px;font:13px inherit;resize:vertical;min-height:34px}
   .known .paper{opacity:.85}
-  #export{white-space:pre-wrap;font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:16px;display:none}
+  #banner{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:100;max-width:80%;
+    padding:10px 16px;border-radius:8px;font-size:13.5px;box-shadow:0 4px 16px rgba(0,0,0,.25);display:none}
+  #banner.show{display:block}
+  #banner.ok{background:var(--add);color:#fff}
+  #banner.warn{background:var(--discuss);color:#fff}
+  #banner.info{background:var(--fg);color:var(--bg)}
+  #intro{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--discuss);border-radius:8px;padding:12px 16px;margin:0 0 20px;font-size:13.5px}
+  #intro ol{margin:8px 0 4px;padding-left:20px}
+  #intro li{margin:3px 0}
+  #intro code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+  .sortbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+  .sortbtn{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 10px;font-size:12.5px}
+  .sortbtn.sel{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  #customsort{width:100%;gap:6px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12.5px;margin-top:6px}
+  #customsort input,#customsort select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
 </style>
 </head>
 <body>
 <header>
   <h1>Literature review · {{REVIEW_NAME}}</h1>
-  <div class="meta">Generated {{GENERATED}} · Sources: {{SEARCH_LOG}} · OpenAlex credits used: {{CREDIT_SPEND}}</div>
+  <div class="meta">Generated {{GENERATED}} · took {{ELAPSED}} · Sources: {{SEARCH_LOG}} · OpenAlex credits: {{CREDIT_SPEND}} · {{COUNT_NEW}} ranked + {{COUNT_NOABS}} without abstract</div>
   <div class="bar">
+    <button onclick="document.getElementById('new').scrollIntoView()">↧ Ranked ({{COUNT_NEW}})</button>
+    <button onclick="document.getElementById('noabs').scrollIntoView()">↧ No-abstract ({{COUNT_NOABS}})</button>
     <button onclick="setAll('add')">✓ All → Add</button>
     <button onclick="setAll('reject')">✕ All → Reject</button>
     <button onclick="setAll('none')">↺ Clear all</button>
-    <button onclick="saveDecisions()"><strong>💾 Save decisions</strong></button>
+    <span id="savebtns" style="display:none">
+      <button onclick="saveDecisions()"><strong>💾 Save decisions</strong></button>
+      <button onclick="saveDecisionsAs()">Save as…</button>
+    </span>
     <span class="counts" id="counts"></span>
   </div>
 </header>
 <main>
-  <section id="new"><h2>New — missing from your Zotero</h2>{{ROWS_NEW}}</section>
+  <div id="intro">
+    <strong>Where you are:</strong> Claude searched the literature and found papers likely
+    <em>missing from your Zotero</em>. This is your decision page — nothing is added to Zotero until you approve it here.
+    <ol>
+      <li>Papers are <strong>ranked by content relevance</strong> (top = most on-topic, not just most-cited). For each: click <b>Add</b>, <b>Discuss</b>, or <b>Reject</b> + optional note.</li>
+      <li><b>Reject</b> = explicitly not wanted. <b>No selection</b> = "not decided" — kept blank so you can stop anytime and resume later (reopen this page and your choices reload).</li>
+      <li>Papers marked <em>no DOI</em> can't be auto-added — use Discuss/Reject; add those manually in Zotero if you want them.</li>
+      <li><b>Your choices save automatically</b> to <code>decisions.json</code> in this folder as you go — no button to press. When done, just tell Claude <em>"decisions saved"</em>; it adds the approved papers to Zotero (tags + collection + notes).</li>
+      <li>After Claude adds them: in Zotero desktop, select the new <code>added-by-claude</code> items → <b>Zotmoov: Move selected to Directory</b> to pull PDFs locally.</li>
+    </ol>
+    <span id="savehint" class="meta"></span>
+  </div>
+  <section id="new"><h2>New — missing from your Zotero ({{COUNT_NEW}})</h2>
+    <div class="sortbar">
+      <span class="meta">Sort:</span>
+      <button class="sortbtn" data-sort="similarity" onclick="applySort('similarity',this)">Relevance</button>
+      <button class="sortbtn" data-sort="citations" onclick="applySort('citations',this)">Citations</button>
+      <button class="sortbtn sel" data-sort="mix" onclick="applySort('mix',this)">Mix</button>
+      <button class="sortbtn" data-sort="custom" onclick="showCustom(this)">Custom…</button>
+    </div>
+    <div id="sortinfo" class="meta" style="display:none"></div>
+    <div id="customsort" style="display:none">
+      <label>Take top <input id="topN" type="number" value="100" min="1" style="width:60px"> by
+        <select id="primary"><option value="citations">citations</option><option value="similarity" selected>relevance</option></select>,
+        then sort those by
+        <select id="secondary"><option value="similarity">relevance</option><option value="citations" selected>citations</option></select>
+      </label>
+      <button onclick="applyCustom()">Apply</button>
+    </div>
+    <div id="newlist">{{ROWS_NEW}}</div>
+  </section>
   <section id="uncertain"><h2>Uncertain / possible duplicate — needs your call</h2>{{ROWS_UNCERTAIN}}</section>
+  <section id="noabs"><h2>No abstract available — not content-ranked, shown so you don't miss them ({{COUNT_NOABS}})</h2>
+    <p class="meta">These lack an abstract in all sources, so they couldn't be ranked. Click a title to check the paper; decide manually.</p>
+    {{ROWS_NOABS}}</section>
   <section class="known"><h2>Already in your Zotero — context only</h2>{{ROWS_KNOWN}}</section>
-  <pre id="export"></pre>
 </main>
+<div id="banner"></div>
 <script>
   function papers(){return[...document.querySelectorAll('.paper[data-doi]')]}
   function choose(el,c){
     const p=el.closest('.paper');p.dataset.decision=c;
     p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));
-    updateCounts();
+    updateCounts(); queueSave();
   }
   function setAll(c){papers().forEach(p=>{if(!p.closest('.known')){p.dataset.decision=c;
-    p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));}});updateCounts();}
+    p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));}});updateCounts(); queueSave();}
   function updateCounts(){
     const c={add:0,discuss:0,reject:0,none:0};
     papers().forEach(p=>{if(!p.closest('.known'))c[p.dataset.decision||'none']++});
     document.getElementById('counts').textContent=`add ${c.add} · discuss ${c.discuss} · reject ${c.reject} · undecided ${c.none}`;
   }
-  function saveDecisions(){
-    // Browsers do NOT persist in-memory DOM edits back to the .html file on Ctrl+S, so we
-    // DOWNLOAD a decisions.json the skill reads back. Robust, no server needed.
+  function collectDecisions(){
     const decisions=[];
     papers().forEach(p=>{
       if(p.closest('.known'))return;
@@ -99,44 +149,157 @@
       const d=p.dataset.decision||'none';
       if(d!=='none')decisions.push({decision:d, doi:p.dataset.doi||'', title:(p.querySelector('.ptitle')||{}).textContent||'', note:note?note.value.trim():''});
     });
-    const payload={review:document.title.replace(/^lit-review · /,''), saved:new Date().toISOString(), decisions};
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download='decisions.json';
+    return {review:document.title.replace(/^lit-review · /,''), saved:new Date().toISOString(), decisions};
+  }
+  // Fixed banner (does NOT scroll the page). kind: ok|warn|info
+  let msgTimer=null;
+  function msg(t, kind){
+    const b=document.getElementById('banner');
+    b.textContent=t; b.className='show '+(kind||'info');
+    clearTimeout(msgTimer);
+    if(kind==='ok') msgTimer=setTimeout(()=>{b.className='';}, 4000);
+  }
+  const served = location.protocol==='http:'||location.protocol==='https:';
+  function download(json, name){
+    const blob=new Blob([json],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
     document.body.appendChild(a); a.click(); a.remove();
-    const ex=document.getElementById('export');
-    ex.style.display='block';
-    ex.textContent='Downloaded decisions.json ('+decisions.length+' decisions).\n'+
-      '→ Move it into this review folder (next to the .html), then tell Claude it is ready.';
-    ex.scrollIntoView({behavior:'smooth'});
+  }
+  // Debounced silent autosave (served mode). Fires ~700ms after the last change.
+  let saveTimer=null, priorLoaded=false;
+  function queueSave(){
+    if(!served || !priorLoaded) return;  // only autosave once served + after prior decisions loaded
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(async()=>{
+      try{
+        const p=collectDecisions();
+        await postSave(JSON.stringify(p,null,2),'decisions.json');
+        msg('✅ Auto-saved ('+p.decisions.length+' decisions) → decisions.json','ok');
+      }catch(e){ msg('⚠ Auto-save failed ('+e.message+'). Is the local server running?','warn'); }
+    },700);
+  }
+  // POST to the local server → it writes <name> into the review folder. True silent autosave.
+  async function postSave(json, name){
+    const r=await fetch('/save?name='+encodeURIComponent(name), {method:'POST',
+      headers:{'content-type':'application/json'}, body:json});
+    if(!r.ok) throw new Error('server '+r.status);
+    return r.json();
+  }
+  let fsHandle=null;
+  async function writeHandle(h, json){const w=await h.createWritable(); await w.write(json); await w.close();}
+  // Primary: POST to server (no picker). Fallbacks: File System Access picker, then download.
+  async function saveDecisions(){
+    const payload=collectDecisions(); const json=JSON.stringify(payload,null,2);
+    const n=payload.decisions.length;
+    if(served){
+      try{ const res=await postSave(json,'decisions.json');
+        msg('✅ Saved '+n+' decisions → '+res.path+'   Tell Claude "decisions saved".','ok'); return;
+      }catch(e){ /* fall through */ }
+    }
+    if(window.showSaveFilePicker){
+      try{
+        if(!fsHandle) fsHandle=await window.showSaveFilePicker({suggestedName:'decisions.json', id:'litreview',
+          startIn:'documents', types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+        await writeHandle(fsHandle, json);
+        msg('✅ Saved '+n+' decisions to decisions.json.   Tell Claude "decisions saved".','ok'); return;
+      }catch(e){ if(e&&e.name==='AbortError'){msg('Save cancelled — nothing written.','warn');return;} }
+    }
+    download(json,'decisions.json');
+    msg('⬇ Downloaded decisions.json ('+n+') — move it into the review folder, then tell Claude "decisions saved".','warn');
+  }
+  async function saveDecisionsAs(){
+    const payload=collectDecisions(); const json=JSON.stringify(payload,null,2);
+    if(window.showSaveFilePicker){
+      try{ const h=await window.showSaveFilePicker({suggestedName:'decisions-copy.json', id:'litreview',
+          startIn:'documents', types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+        await writeHandle(h, json); msg('✅ Saved a separate copy.','ok'); return;
+      }catch(e){ if(e&&e.name==='AbortError'){msg('Save cancelled.','warn');return;} }
+    }
+    download(json,'decisions-copy.json'); msg('⬇ Downloaded decisions-copy.json.','warn');
+  }
+  // ---- on-the-fly sorting of the ranked (New) list ----
+  function simOf(p){return parseFloat(p.dataset.sim||-1);}
+  function citOf(p){return parseInt(p.dataset.cited||-1);}
+  function reorder(arr){const list=document.getElementById('newlist');arr.forEach(p=>list.appendChild(p));}
+  function rankNorm(items,key){ // 0..1 normalized rank by key (higher key → higher norm)
+    const vals=[...items].sort((a,b)=>key(b)-key(a)); const m=new Map();
+    vals.forEach((p,i)=>m.set(p, vals.length>1?1-i/(vals.length-1):1)); return m;
+  }
+  const MIX_SIM=0.6, MIX_CIT=0.4; // blend weights for Mix
+  function setSortSel(btn){document.querySelectorAll('.sortbtn').forEach(b=>b.classList.remove('sel'));if(btn)btn.classList.add('sel');}
+  function sortInfo(text){ // inline info line (same slot as custom panel); '' hides it
+    const el=document.getElementById('sortinfo');
+    el.textContent=text||''; el.style.display=text?'block':'none';
+  }
+  function showCustom(btn){
+    setSortSel(btn); sortInfo('');                       // hide the mix info line
+    document.getElementById('customsort').style.display='flex';
+  }
+  function applySort(mode,btn){
+    setSortSel(btn);
+    document.getElementById('customsort').style.display='none';  // presets hide the custom panel
+    const items=[...document.querySelectorAll('#newlist .paper')];
+    if(mode==='similarity'){ items.sort((a,b)=>simOf(b)-simOf(a)); sortInfo(''); }
+    else if(mode==='citations'){ items.sort((a,b)=>citOf(b)-citOf(a)); sortInfo(''); }
+    else{ // mix: blend normalized similarity + normalized citations
+      const ns=rankNorm(items,simOf), nc=rankNorm(items,citOf);
+      items.sort((a,b)=>(MIX_SIM*ns.get(b)+MIX_CIT*nc.get(b))-(MIX_SIM*ns.get(a)+MIX_CIT*nc.get(a)));
+      sortInfo(`Mix = ${Math.round(MIX_SIM*100)}% relevance + ${Math.round(MIX_CIT*100)}% citations (rank-normalized).`);
+    }
+    reorder(items);
+  }
+  function applyCustom(){
+    setSortSel(document.querySelector('.sortbtn[data-sort=custom]'));
+    sortInfo('');
+    const N=Math.max(1,parseInt(document.getElementById('topN').value)||100);
+    const prim=document.getElementById('primary').value, sec=document.getElementById('secondary').value;
+    const keyf=k=>k==='citations'?citOf:simOf;
+    let items=[...document.querySelectorAll('#newlist .paper')];
+    // take top N by primary, then sort those by secondary; the rest keep after, sorted by secondary too
+    items.sort((a,b)=>keyf(prim)(b)-keyf(prim)(a));
+    const top=items.slice(0,N).sort((a,b)=>keyf(sec)(b)-keyf(sec)(a));
+    const rest=items.slice(N).sort((a,b)=>keyf(sec)(b)-keyf(sec)(a));
+    reorder(top.concat(rest));
+    sortInfo(`Custom: top ${N} by ${prim}, then sorted by ${sec}.`);
   }
   // Restore selection styling from data-decision on load (for re-opened / re-generated files).
   papers().forEach(p=>{const d=p.dataset.decision;if(d)p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===d));
     const n=p.querySelector('.note');if(n&&p.dataset.note)n.value=p.dataset.note;});
   updateCounts();
+  // autosave note edits too (debounced via queueSave)
+  papers().forEach(p=>{const n=p.querySelector('.note'); if(n) n.addEventListener('input', queueSave);});
+  // Save buttons only shown when NOT served (file:// fallback); served = silent autosave.
+  if(served){ document.getElementById('savebtns').style.display='none'; }
+  else{ document.getElementById('savebtns').style.display='inline'; }
+  document.getElementById('savehint').textContent = served
+      ? '✓ Auto-save on: your choices write to decisions.json in this folder automatically as you go. Your prior choices auto-load on open.'
+      : '⚠ Opened via file:// — no auto-save. Use the 💾 Save buttons (downloads the file); move it into the review folder. Open via the localhost link Claude gave you for auto-save + resume.';
+
+  // Resume: auto-load prior decisions.json (served case) and restore choices + notes.
+  async function loadPrior(){
+    if(served){
+      try{
+        const r=await fetch('decisions.json',{cache:'no-store'});
+        if(r.ok){
+          const data=await r.json();
+          const byDoi={};
+          (data.decisions||[]).forEach(d=>{ if(d.doi) byDoi[d.doi]=d; });
+          let n=0;
+          papers().forEach(p=>{
+            const d=byDoi[p.dataset.doi]; if(!d) return;
+            p.dataset.decision=d.decision;
+            p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===d.decision));
+            const note=p.querySelector('.note'); if(note&&d.note) note.value=d.note;
+            n++;
+          });
+          updateCounts();
+          if(n) msg('Restored '+n+' prior decisions. Undecided papers left blank so you can continue.','info');
+        }
+      }catch(e){}
+    }
+    priorLoaded=true;  // enable autosave only AFTER restore, so loading doesn't overwrite with empty
+  }
+  loadPrior();
 </script>
-<!--
-  ROW TEMPLATE — one per paper (New / Uncertain). data-decision starts "none".
-  <article class="paper" data-doi="10.xxxx/yyyy" data-decision="none" data-note="">
-    <div class="ptitle"><a href="https://doi.org/10.xxxx/yyyy" target="_blank">TITLE</a></div>
-    <div class="authors">Author A, Author B, Author C … · YEAR · VENUE</div>
-    <div class="chips">
-      <span class="chip">OpenAlex</span><span class="chip">S2 rec</span>
-      <span class="chip ok">✓ DOI resolves</span>
-      <span class="chip">cited 42×</span>
-      <!-- if retracted: --><span class="chip warn">⚠ RETRACTED</span>
-    </div>
-    <details class="abs"><summary>Abstract</summary><p>ABSTRACT TEXT</p></details>
-    <div class="choice">
-      <button data-c="add"     onclick="choose(this,'add')">Add</button>
-      <button data-c="discuss" onclick="choose(this,'discuss')">Discuss</button>
-      <button data-c="reject"  onclick="choose(this,'reject')">Reject</button>
-    </div>
-    <textarea class="note" placeholder="Note (why / for Zotero / to discuss)…"></textarea>
-  </article>
-  KNOWN-SET rows: same <article class="paper"> but inside <section class="known">, no .choice / .note needed
-  (or include them disabled) — the known section is context only.
--->
 </body>
 </html>

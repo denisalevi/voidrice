@@ -26,6 +26,10 @@ def chips(c, bucket):
         elif v.get("no_doi"): out.append('<span class="chip warn">✓ real · no DOI (manual add)</span>')
         elif v.get("verified"): out.append('<span class="chip ok">✓ verified</span>')
         else: out.append('<span class="chip warn">⚠ unverified</span>')
+    if c.get("sim") is not None: out.insert(0, f'<span class="chip ok">relevance {c["sim"]:.2f}</span>')
+    via = c.get("abstract_via")
+    if via == "s2-tldr": out.append('<span class="chip warn">abstract = AI TLDR only</span>')
+    elif via in ("europepmc", "s2"): out.append(f'<span class="chip">abstract via {via}</span>')
     if c.get("cited_by") is not None: out.append(f'<span class="chip">cited {c["cited_by"]}×</span>')
     ret = c.get("retraction")
     if ret: out.append('<span class="chip warn">⚠ RETRACTED</span>')
@@ -55,7 +59,9 @@ def row(c, bucket):
                   '<button data-c="discuss" onclick="choose(this,\'discuss\')">Discuss</button>'
                   '<button data-c="reject" onclick="choose(this,\'reject\')">Reject</button></div>'
                   '<textarea class="note" placeholder="Note…"></textarea>')
-    return (f'<article class="paper" data-doi="{esc(doi)}" data-decision="none" data-note="">'
+    sim = c.get("sim"); cb = c.get("cited_by")
+    dattrs = f' data-sim="{sim if sim is not None else -1}" data-cited="{cb if cb is not None else -1}"'
+    return (f'<article class="paper" data-doi="{esc(doi)}" data-decision="none" data-note=""{dattrs}>'
             f'<div class="ptitle"><a href="{esc(link)}" target="_blank" rel="noopener">{esc(c.get("title"))}</a></div>'
             f'<div class="authors">{meta}</div>'
             f'<div class="chips">{chips(c, bucket)}</div>'
@@ -64,6 +70,22 @@ def row(c, bucket):
 
 def rows(cs, bucket):
     return "\n".join(row(c, bucket) for c in cs) if cs else '<p class="meta">none</p>'
+
+def elapsed_str(run):
+    """kickoff→now, from the earliest 'started' across summaries."""
+    import datetime as dt
+    starts = []
+    for f in ("search_summary.json", "snowball_summary.json"):
+        p = run/f
+        if p.exists():
+            s = json.loads(p.read_text()).get("started")
+            if s:
+                try: starts.append(dt.datetime.fromisoformat(s))
+                except Exception: pass
+    if not starts: return "n/a"
+    delta = dt.datetime.now() - min(starts)
+    secs = int(delta.total_seconds())
+    return f"{secs//60}m {secs%60}s" if secs >= 60 else f"{secs}s"
 
 def main():
     ap = argparse.ArgumentParser()
@@ -77,21 +99,28 @@ def main():
         p = run/f
         if p.exists():
             credits += json.loads(p.read_text()).get("openalex_credits", 0)
+    # combine any leftover 'uncertain' into new (rank.py folds them in; guard if rank not run)
+    new_ranked = b.get("new", [])
+    noabs = b.get("new_no_abstract", [])
     tpl = TPL.read_text()
     out = (tpl.replace("{{REVIEW_NAME}}", esc(a.name))
               .replace("{{GENERATED}}", L.now())
+              .replace("{{ELAPSED}}", elapsed_str(run))
               .replace("{{SEARCH_LOG}}", esc(a.search_log))
               .replace("{{CREDIT_SPEND}}", str(credits))
-              .replace("{{ROWS_NEW}}", rows(b.get("new", []), "new"))
+              .replace("{{COUNT_NEW}}", str(len(new_ranked)))
+              .replace("{{COUNT_NOABS}}", str(len(noabs)))
+              .replace("{{ROWS_NEW}}", rows(new_ranked, "new"))
+              .replace("{{ROWS_NOABS}}", rows(noabs, "noabs"))
               .replace("{{ROWS_UNCERTAIN}}", rows(b.get("uncertain", []), "uncertain"))
               .replace("{{ROWS_KNOWN}}", rows(b.get("known", []), "known")))
-    # validate BEFORE writing, and only for OUR named placeholders (candidate text may contain "{{")
-    leftover = [ph for ph in ("{{REVIEW_NAME}}","{{GENERATED}}","{{SEARCH_LOG}}","{{CREDIT_SPEND}}",
-                              "{{ROWS_NEW}}","{{ROWS_UNCERTAIN}}","{{ROWS_KNOWN}}") if ph in out]
+    leftover = [ph for ph in ("{{REVIEW_NAME}}","{{GENERATED}}","{{ELAPSED}}","{{SEARCH_LOG}}","{{CREDIT_SPEND}}",
+                              "{{COUNT_NEW}}","{{COUNT_NOABS}}","{{ROWS_NEW}}","{{ROWS_NOABS}}",
+                              "{{ROWS_UNCERTAIN}}","{{ROWS_KNOWN}}") if ph in out]
     if leftover: sys.exit(f"unfilled placeholders: {leftover}")
     outp = Path(a.out); outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(out)
-    print(f"wrote {outp} · new={len(b.get('new',[]))} uncertain={len(b.get('uncertain',[]))} "
+    print(f"wrote {outp} · new={len(new_ranked)} no_abstract={len(noabs)} "
           f"known={len(b.get('known',[]))} credits≈{credits}")
 
 if __name__ == "__main__":

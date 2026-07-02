@@ -111,16 +111,43 @@ Result: three buckets — Already-in-Zotero, NEW candidates, Uncertain.
 - **Retraction/quality check:** `scite_enrich_item(doi=…)` → surface retraction alerts +
   support/contrast counts on the HTML page. A retracted paper must be flagged prominently.
 
-### 6. Present — interactive HTML review page
-Render `templates/review.html` filled with the three buckets. Write to
-**`literature-reviews/<review-name>/<review-name>.html`** in the current repo (create the folder).
-Each NEW/Uncertain paper row must have: full author list, foldable abstract, `doi.org/<doi>`
-hyperlink (fallback to best available URL if no DOI), source-provenance chip(s), verification +
-retraction status, a free-text note field, and a per-paper choice (add / discuss / reject).
-Include top-level "select all add / none" buttons and a header with the search log + credit spend.
-Tell Denis to open it in his browser, make choices, write notes, and click **Save decisions** —
-which DOWNLOADS a `decisions.json` (browsers can't persist DOM edits back to the .html on Ctrl+S).
-Ask him to move `decisions.json` into the review folder next to the .html and tell you it's ready.
+### 6. Present — interactive HTML review page(s)
+Render `templates/review.html` filled with the three buckets. Each NEW/Uncertain paper row must
+have: full author list, foldable abstract, `doi.org/<doi>` hyperlink (fallback to best available
+URL if no DOI), source-provenance chip(s), verification + retraction status, a free-text note
+field, and a per-paper choice (add / discuss / reject). Include top-level "select all add / none"
+buttons and a header with the search log + credit spend.
+
+**Curating never hides the full set — always present BOTH.** Ranking/curation is a convenience,
+not a filter Denis is stuck with: the final judgement of what is relevant is his. So whenever you
+narrow a large discovery set to a curated shortlist, you MUST also produce a page with the FULL
+ranked set (everything not already in his Zotero, highest-relevance first, no-abstract items
+appended). Never present only the curated view. Lay them out as sibling subfolders so each page
+gets its own `decisions.json` (the page always POSTs to `decisions.json`, so two pages in one
+folder would clobber each other):
+
+- `literature-reviews/<review-name>/curated/<review-name>.html`  ← curated shortlist
+- `literature-reviews/<review-name>/full/<review-name>.html`     ← full ranked set
+
+If the discovery set is already small enough to review whole (no curation needed), a single
+`full/` page is fine — say so. Give each page a distinct `--name` (e.g. `… (CURATED · N)` vs
+`… (FULL · all ranked)`) and cross-reference them in each page's `--search-log` so Denis knows
+the other exists.
+
+**Serve every page you produce and hand Denis the links.** A `file://` page can't auto-save
+decisions, so always serve — never just hand over a path. Run `scripts/serve.py --dir <subfolder>
+[--port <p>]` in the BACKGROUND, one server per subfolder (different ports). `serve.py` falls back
+to a random free port if the requested one is taken, so DO NOT trust the port you asked for —
+read the actual `OPEN: http://127.0.0.1:<port>/…` line from each server's log and `curl` it to
+confirm HTTP 200 before quoting it. Then show Denis a short labelled list of the live links, e.g.:
+- **Curated (N):** http://127.0.0.1:<port>/<review-name>.html
+- **Full (all ranked):** http://127.0.0.1:<port>/<review-name>.html
+
+Tell Denis to open the link(s), make choices, and write notes. Served pages **auto-save** each
+choice to `decisions.json` in that subfolder — no button needed. (Only if he opens a bare
+`file://` page does he need the 💾 Save button, which downloads `decisions.json` for him to move
+into the folder.) He reviews whichever page(s) he likes; decisions from BOTH are honoured at add
+time (step 7 reads every `decisions.json` under the review folder and unions them, deduping by DOI).
 
 Then STOP and hand off to Denis. Do not add anything yet.
 
@@ -131,8 +158,12 @@ re-run `build_html.py` so retraction warnings show. At minimum, retraction-check
 chose to add, and refuse/flag any that are retracted.
 
 ### 7. Add — only after Denis returns his choices
-Read `decisions.json` from the review folder. For every entry with `decision=="add"` (these always
-have a DOI — the UI only offers Add to DOI-bearing papers; no-DOI papers are Discuss/Reject only):
+Read **every** `decisions.json` under the review folder (e.g. `curated/decisions.json` and
+`full/decisions.json`) and UNION them, deduping by normalized DOI. If the same DOI appears in
+both with conflicting decisions, prefer `add` over `discuss` over `reject`, but call out the
+conflict to Denis rather than silently resolving it. For every entry with `decision=="add"`
+(these always have a DOI — the UI only offers Add to DOI-bearing papers; no-DOI papers are
+Discuss/Reject only):
 - Ensure the review subcollection exists: `zotero_create_collection("<review-name>",
   parent_collection="2S432WWF")` (parent `LLM-literature-reviews` = key `2S432WWF`).
 - `zotero_add_by_doi(doi, collections=<subcollection key>,

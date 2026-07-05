@@ -26,47 +26,6 @@ as the place new work is tracked.
 
 Ranked roughly by value/effort. Ticket IDs are stable so we can reference them.
 
-### Performance / no-LLM automation
-
-- **A1 — Do the Zotero add + note-attach PROGRAMMATICALLY via the API, not via per-item MCP/agent calls.**
-  *Motivating incident (drosophila-chapter-v2):* adding 44 papers meant ~90 sequential MCP hops
-  (`zotero_add_by_doi` + `zotero_create_note` each), each ~1–3s (CrossRef fetch + Unpaywall/PMC PDF
-  probe). Slow and annoying, and **none of it needs an LLM** — it is deterministic add-DOI-and-attach
-  mechanics. The MCP server is just a thin wrapper over the Zotero API.
-  **Fix:** a `scripts/zotero_add.py` that talks to the Zotero API directly:
-  - **Zotero supports BATCH item creation** — `POST /users/<uid>/items` (Web API, needs
-    `~/.config/zotero-api.key` + userID + `Zotero-API-Version: 3`) OR the local connector API
-    (`http://localhost:23119/…`, no key, Zotero must be running) — accepts an ARRAY of up to **50
-    item templates per request**. So 44 items = ONE POST, not 44. Notes are child items
-    (`itemType:"note"`, `parentItem:<key>`) and can go in a second batch POST (or same, using
-    0-based `parentItem` back-refs). Collections set via each item's `collections:[<key>]`; tags via
-    `tags:[{tag:...}]`. Metadata: fetch each DOI's CSL/CrossRef once (parallelizable, cache), map to
-    Zotero item template. `attach_mode` equivalent = simply don't create an attachment (metadata only)
-    — protects the Zotmoov PDF flow, same as `attach_mode="none"`.
-  - Net: ~2 HTTP calls + N cheap CrossRef fetches instead of ~90 serialized MCP calls, and **zero LLM**.
-  - Keep the human approval gate (served page → decisions.json) and the DOI-exact dedup (D1) upstream;
-    A1 only replaces the *mechanical add* at the very end. Mirror the "scripts do mechanics" architecture.
-  - **Web-search findings (2026-07-02):**
-    - Batch write IS supported: `POST <userOrGroupPrefix>/items` with an ARRAY of item objects,
-      `Content-Type: application/json`, and a `Zotero-Write-Token` (or `If-Unmodified-Since-Version`)
-      header. Docs say **up to 50 per request**, BUT a dev-list report says the practical cap was
-      lowered to **10/request** at some point — so **chunk in batches of 10** and treat 50 as
-      best-case. (zotero.org/support/dev/web_api/v3/write_requests + basics.)
-    - **No native CLI / no import-into-a-named-collection-without-GUI.** The only "bulk import" is
-      GUI File→Import of a merged RIS/BibTeX/CSL-JSON file (community trick: `cat *.ris > merged.ris`
-      then import once). It cannot target a specific collection non-interactively and doesn't set our
-      tags — so it is NOT a fit for this automated add-only flow. **Prefer the batch write API.**
-    - Local connector API (`localhost:23119`) is confirmed READ-capable (used it to read the
-      collection). Still-TODO: confirm whether it exposes item WRITE, or if writes must go through
-      `api.zotero.org` (needs `~/.config/zotero-api.key` + userID). Prefer the web API for writes.
-    - Notes are child items (`itemType:"note"`, `parentItem:<key>`); can be created in a second batch
-      once parent keys are known, or same batch using back-refs — verify parentItem back-ref syntax.
-    - Better BibTeX citekey + bib regeneration: writing to Zotero is the supported path, so the bib
-      should regenerate; verify once on first real run.
-  Sources: https://www.zotero.org/support/dev/web_api/v3/write_requests ·
-  https://www.zotero.org/support/dev/web_api/v3/basics ·
-  https://www.zotero.org/support/kb/importing_standardized_formats
-
 ### Attachment / PDF handling (BUG — found 2026-07-02, drosophila-chapter)
 
 - **A2 — `zotero_add_by_doi(attach_mode="none")` is NOT honored; it still creates PDF attachment
@@ -118,41 +77,61 @@ Ranked roughly by value/effort. Ticket IDs are stable so we can reference them.
 
 ### Dedup / correctness
 
-- **D1 — DOI-exact dedup against the WHOLE Zotero library (not just the built known-set).**
-  *Motivating incident:* in drosophila-chapter-v2, 6 of Denis's 50 chosen adds were already
-  in his library (Handler 2019 `10.1016/j.cell.2019.05.040` / LMTLXCM7; Otto 2020
-  `10.1016/j.cub.2020.05.077` / ISGE4K3E; Zhao 2021 `10.1038/s41598-021-85841-y` / V83KBVKN;
-  Thum&Gerber 2019 `10.1016/j.conb.2018.10.007` / ARLUFKSA; `10.3389/fncir.2015.00073` /
-  YVAEFRXU; `10.1073/pnas.1921294117` / ER3SGKX2). They slipped through because the
-  `known_set.json` is built from a handful of topical semantic/collection searches, so items
-  living elsewhere in the library — or with different venue/casing than the fuzzy matcher
-  expected — are not in it. The current fuzzy title+author+year match is not enough.
-
-  **Fix (two layers):**
-  1. *Cheap gate at add-time (do this first, small):* before the irreversible Zotero add in
-     SKILL §7, for each chosen-add DOI run an exact-DOI library check
-     (`zotero_advanced_search`, `conditions=[{"field":"DOI","operation":"is","value":<doi>}]`).
-     If PRESENT → do NOT `zotero_add_by_doi`; instead just add the existing item to the
-     review subcollection (§7 already does this for known items) and skip the `added-by-claude`
-     tag. This is only the handful the user chose, so it is cheap and fully reliable.
-  2. *Earlier signal (nicer):* run the same exact-DOI pass over the top-N + curated during
-     classification and mark such candidates as "already in library" on the HTML page (a chip),
-     so the user sees it before choosing. Optional; layer 1 is the safety net.
-
-  **Cost note / how to run it:** this is pure tool-call-and-compare with a deterministic
-  verdict — no frontier-model reasoning. Delegate it to a **Haiku subagent** (validated
-  2026-07-02: 17 DOIs, ~24k tokens, 23 tool calls, all correct). Watch two gotchas the agent
-  must handle: (a) Zotero stores DOIs with mixed casing, so on a "No items found" retry once
-  lowercased and once with common casing (e.g. `10.7554/eLife.NNNN`); (b) preprint↔published
-  DOIs differ, so an exact-DOI miss does not rule out owning the published twin — keep the
-  existing fuzzy title pass as a second signal, don't replace it. Consider a small
-  `scripts/zotero_dedup.py`-style helper that emits the DOI list for the agent and ingests its
-  PRESENT/MISSING verdict, mirroring the notes_todo/merge_fields pattern (scripts do mechanics,
-  subagent does the MCP calls the scripts can't).
+- **D1 layer-1 (add-time exact-DOI gate) — DONE, folded into A1** (see Implemented 2026-07-05).
+  `zotero_add.py` builds a DOI→key index over the WHOLE library and skips any chosen-add already
+  owned, with casing variants. **D1 layer-2 still OPEN (optional nicety):** run the same exact-DOI
+  pass over top-N + curated DURING classification and show an "already in library" chip on the HTML
+  page, so Denis sees it BEFORE choosing. Layer-1 is the safety net; layer-2 is just earlier signal.
+  Caveat preserved: an exact-DOI miss doesn't rule out owning the published twin of a preprint — the
+  fuzzy title pass (dedup_verify) stays as the second signal, and D3 collapses the twins.
 
 ---
 
 ## Implemented
+
+### 2026-07-05 — A1 + D1(layer-1): programmatic keyless batched Zotero add (Fable 5, live-tested)
+New `scripts/zotero_add.py` replaces the ~2×N sequential MCP hops (`zotero_add_by_doi` +
+`zotero_create_note`) at the END of the pipeline with a handful of HTTP calls to the RUNNING Zotero
+desktop's **local connector API** (`http://localhost:23119`) — **no API key, no LLM**.
+- **Write path discovered this session (better than the ticket's plan).** The ticket assumed the
+  web API (`api.zotero.org` + `~/.config/zotero-api.key`, which does NOT exist here). Probed the
+  live Zotero **9.0** instead:
+  - Local **read** API `/api/users/<uid>/items…` mirrors Web API v3, keyless (uid resolved to 5685020
+    from `users/0` self-alias). But its `/items` collection endpoint is **read-only** (`POST` → 400
+    "Endpoint does not support method"; `DELETE` → 501). So no batch write there.
+  - **Local connector `/connector/saveItems` DOES write, keyless** (needs a browser-ish User-Agent +
+    `X-Zotero-Connector-API-Version: 3`). Verified: single + batch item creation → HTTP 201, items
+    land in the library; `target:"C<collectionKey>"` routes into a specific collection (tested
+    `C2S432WWF` → landed in `2S432WWF`); `tags:[{tag}]` and child `notes:[{note}]` both honored
+    (numChildren:1). `/connector/import` also works (translates RIS authoritatively) but ignores
+    tags/target/notes, so `saveItems` is the right path. There is **NO connector endpoint to add an
+    EXISTING item to a collection** (`/connector/collections|addToCollection` → 404) — so owned→
+    collection membership STAYS on MCP `zotero_manage_collections` (cheap, not the bottleneck).
+- **What zotero_add.py does:** read decisions.json → take `decision=="add"` (DOI-bearing) → **D1
+  layer-1 dedup** (build DOI→key index over ALL top-level library items via the local read API, with
+  casing variants; skip already-owned, report them) → resolve each surviving DOI via **Crossref
+  CSL-JSON content negotiation** (`https://doi.org/<doi>`, `Accept: …csl+json`; 404/non-JSON = dead
+  DOI, skipped, reported) → **`csl_to_zotero()`** maps CSL→Zotero item (journalArticle/preprint/
+  conferencePaper/bookSection/… with per-type container field; zero-padded date; JATS-stripped
+  abstract) → attach tags `["added-by-claude","lit-review/<name>"]` + a dated "LLM lit-review notes"
+  child note → **batch `POST /connector/saveItems`** (chunked, default 20) into the subcollection.
+  **Metadata-only — NO PDF attachment** (same intent as old `attach_mode="none"`; protects Zotmoov).
+  Writes `zotero_add_report.json` (saved / already_owned / dead_dois / owned_needs_collection /
+  save_errors). `--dry-run` previews without writing.
+- **Live-tested end-to-end** against Denis's running Zotero (synthetic decisions.json): real DOI
+  `10.1038/nature12373` added as item 6NGSHRDN — correct type/title/DOI/Nature/vol 500/date/creators,
+  tags `[added-by-claude, lit-review/a1-selftest]`, collection `2S432WWF`, child note with the dated
+  block + Denis's note; owned DOI `10.1016/j.tics.2022.10.004` correctly caught by D1 as owned
+  (→ZMMBHNUU, library index = 1431 DOIs / 1650 items — exactly the whole-library coverage the
+  known-set missed); dead DOI skipped; `reject` ignored; `owned→collection` reported for MCP. Report:
+  saved 1, errors 0. Unit-tested date-padding + CSL type mapping separately.
+- **SKILL §7 rewritten** to call the script (create subcollection via MCP first → run zotero_add.py →
+  then MCP `zotero_manage_collections` for the report's `already_owned` + `owned_needs_collection`).
+  Per-paper-notes section clarified: new adds get their note from the script; the MCP prepend pattern
+  is now only for owned/multi-review/manual cases.
+- **Cleanup owed:** the write-path probing left ~5 `ZZZ-litreview-…-DELETE-ME` test items in the
+  library (searchable by "ZZZ-litreview"); the local API can't delete (501) — remove manually in
+  Zotero desktop. Future: probe into a throwaway collection or gate probes behind `--dry-run`.
 
 ### 2026-07-05 — U1 floating nav widget + U2 verified (Fable 5, browser-tested)
 - **U1 — always-on-screen floating nav.** New `#navwidget` (fixed bottom-left, so it never collides

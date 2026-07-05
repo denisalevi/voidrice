@@ -258,44 +258,44 @@ folder — no button needed (the 💾 button is only a `file://` fallback that d
 Then STOP and hand off to Denis. Do not add anything yet.
 
 ### 7. Add — only after Denis returns his choices
-Read `decisions.json` from the review folder. For every entry with `decision=="add"` (these always
-have a DOI — the UI only offers Add to DOI-bearing papers; no-DOI papers are Discuss/Reject only):
-- **DOI-exact library dedup FIRST (the addable subset only) — the known-set is NOT enough.** The
-  `known_set.json` is built from a few topical searches, so items living elsewhere in Denis's library
-  slip through and get re-added as duplicates (this bit us: 6/50 chosen adds were already owned in the
-  drosophila-chapter-v2 review). Before adding, run an exact-DOI check against the WHOLE library for
-  each chosen-add DOI: `zotero_advanced_search(conditions=[{"field":"DOI","operation":"is","value":<doi>}])`.
-  If PRESENT → do NOT `zotero_add_by_doi`; instead treat it as already-owned (add the existing item to
-  the subcollection, no `added-by-claude` tag). Casing gotcha: Zotero stores mixed-case DOIs, so on a
-  "No items found", retry once lowercased and once with common casing (e.g. `10.7554/eLife.NNNN`) before
-  concluding MISSING. This is a mechanical tool-call loop with a deterministic verdict — **delegate it to
-  a Haiku subagent** (validated cheap: ~24k tokens for 17 DOIs). See ticket D1 in `IMPROVEMENTS.md`.
-- **Resolve each surviving (MISSING) DOI before adding.** The verify-by-source fast path marks
-  trusted-index DOIs verified for *display* without resolving them; before an irreversible Zotero add,
-  confirm the DOI actually resolves — batched HEAD/GET to `https://doi.org/<doi>` or
-  `https://api.crossref.org/works/<doi>` (200/3xx = real). This is only the handful Denis chose to add,
-  so it's cheap; skip/flag any that 404 rather than adding a dead DOI. (Do NOT bulk-resolve all
-  candidates — only the chosen adds.)
-- Ensure the review subcollection exists: `zotero_create_collection("<review-name>",
-  parent_collection="2S432WWF")` (parent `LLM-literature-reviews` = key `2S432WWF`).
-- `zotero_add_by_doi(doi, collections=<subcollection key>,
-  tags=["added-by-claude", "lit-review/<review-name>"], attach_mode="none")`.
-  `attach_mode="none"` = metadata only, NO cloud PDF (protects the Zotmoov flow).
-- Add the per-paper note (see below).
-- **REQUIRED — populate the collection with the already-owned items Denis CHOSE, so it is the COMPLETE
-  picture of the review.** Owned items now flow through the page exactly like new ones and are judged
-  per-paper, so membership follows Denis's choices, NOT a blanket add-the-whole-known-set: add every
-  decisions.json entry with `owned:true` AND `decision:"collection"` (identified by `zkey` / `doi`),
-  PLUS any chosen-add that the DOI-exact dedup found already owned. Use
-  `zotero_manage_collections(item_keys=[...chosen owned zkeys + owned-adds...], add_to=<subcollection key>)`
-  — chunk into groups of ~25. **These are membership-only: the existing items are NOT re-added as new
-  items, get NO new tags, and specifically must NOT get `added-by-claude` or `lit-review/<review-name>`.**
-  Only the genuinely-new papers carry those tags. (`decision:"skip"` or undecided owned items are left
-  out — that per-paper judgement is the point of the redesign; adding to a collection is trivially
-  reversible, so if Denis was clearly permissive you can flag borderline ones, but default to his
-  choices.) After doing it, VERIFY: paginate the collection (`/collections/<key>/items/top`, default
-  page is 100 — read the `Total-Results` header, don't trust one page) and confirm zero owned items
-  carry `added-by-claude`.
+Read `decisions.json` from the review folder. The mechanical add of the chosen NEW papers (the
+`decision=="add"` entries, always DOI-bearing) is now done PROGRAMMATICALLY by **`scripts/zotero_add.py`**
+— no per-item MCP hops, no LLM. It talks to the RUNNING Zotero desktop's **local connector API**
+(`http://localhost:23119`, keyless) and does D1 dedup + DOI resolution + batched save + note-attach in
+a few HTTP calls (A1). Zotero desktop must be running — check `/connector/ping` first.
+
+- Ensure the review subcollection exists (still MCP — the connector can't create collections):
+  `zotero_create_collection("<review-name>", parent_collection="2S432WWF")` (parent
+  `LLM-literature-reviews` = key `2S432WWF`). Grab the new subcollection KEY.
+- Run the add:
+  `python3 scripts/zotero_add.py --review-dir <folder> --name "<review-name>" --collection <subcollection-key>`
+  (add `--dry-run` first to preview). It:
+  - **D1 dedup against the WHOLE library** — builds a DOI→key index over every top-level item via the
+    local read API (`/api/users/<uid>/items/top`), with casing variants, so items living anywhere in
+    Denis's library are caught (the `known_set.json` alone missed 6/50 in drosophila-chapter-v2). Matches
+    are SKIPPED from the add and reported in `zotero_add_report.json → already_owned` for you to add to
+    the collection via MCP (below).
+  - **Resolves each surviving DOI** via Crossref CSL-JSON content-negotiation (`https://doi.org/<doi>`,
+    `Accept: application/vnd.citationstyles.csl+json`); a 404/non-JSON DOI is a dead DOI — skipped, never
+    added, reported in `dead_dois`.
+  - **Batch-saves** the built items via `POST /connector/saveItems` (chunked), each with tags
+    `["added-by-claude","lit-review/<review-name>"]`, targeted into the subcollection, with a child
+    **"LLM lit-review notes"** note (dated block + Denis's decisions.json note). It is **metadata-only —
+    NO PDF attachment** (same intent as the old `attach_mode="none"`; protects the Zotmoov flow).
+  - Writes `zotero_add_report.json` (saved / already_owned / dead_dois / owned_needs_collection /
+    save_errors). Read it and relay the numbers.
+- **Then, via MCP (cheap, not the bottleneck):** add the ALREADY-OWNED items to the subcollection —
+  both the report's `already_owned` (chosen-adds found in the library) AND `owned_needs_collection`
+  (owned rows Denis marked `decision:"collection"`). The connector has no add-existing-to-collection
+  endpoint, so use `zotero_manage_collections(item_keys=[...], add_to=<subcollection key>)`, chunked ~25.
+  **Membership-only: these existing items get NO new tags — must NOT get `added-by-claude` or
+  `lit-review/<review-name>`.**
+  This membership step is what makes the collection the COMPLETE picture of the review: owned items
+  now flow through the page like new ones and are judged per-paper, so membership follows Denis's
+  choices, NOT a blanket add-the-whole-known-set. `decision:"skip"` / undecided owned items are left
+  out (that per-paper judgement is the point). After doing it, VERIFY: paginate the collection
+  (`/collections/<key>/items/top`, default page is 100 — read the `Total-Results` header, don't trust
+  one page) and confirm zero owned items carry `added-by-claude` (only the genuinely-new papers do).
 After the batch, print: (a) a summary of what was added (new items) vs. added-to-collection (owned),
 (b) the explicit **desktop PDF steps** (no API hook exists for either — they are desktop-UI only; see
 tickets A2/A3):
@@ -306,6 +306,10 @@ storage. Manually grab any the resolver misses via the browser Zotero Connector.
 
 ## Per-paper notes (prepend pattern)
 One note per paper, titled **"LLM lit-review notes"**, each review prepends a dated block.
+**For the NEW papers added by `zotero_add.py`, the note is created for you** (fresh child note, dated
+block, Denis's decisions.json note) — D1 dedup guarantees these are new, so there is no pre-existing
+note to merge. The MCP prepend pattern below is for the OTHER cases: adding/updating a note on an
+already-OWNED item (multi-review overlap), or a manual one-off.
 - Check for an existing note: `zotero_get_notes(item_key, raw_html=True)`.
 - If none: `zotero_create_note(item_key, "LLM lit-review notes", <block>, tags=["added-by-claude"])`.
 - If one exists: build `<h1>LLM lit-review notes</h1>` + NEW block + existing blocks (minus the

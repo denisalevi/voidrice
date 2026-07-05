@@ -298,11 +298,16 @@ a few HTTP calls (A1). Zotero desktop must be running — check `/connector/ping
   one page) and confirm zero owned items carry `added-by-claude` (only the genuinely-new papers do).
 After the batch, print: (a) a summary of what was added (new items) vs. added-to-collection (owned),
 (b) the explicit **desktop PDF steps** (no API hook exists for either — they are desktop-UI only; see
-tickets A2/A3):
-"In Zotero: (1) select the new items (tag `added-by-claude`) → right-click → *Find Full Text* to fetch
-PDFs (its browser-session + your library proxy beats any scripted OA fetch — agents get publisher 403s);
-(2) then right-click → *Zotmoov: Move selected to Directory* to relocate PDFs into your local linked
-storage. Manually grab any the resolver misses via the browser Zotero Connector."
+tickets A2/A3). Give them as an ordered, first-timer-proof sequence, and stress that ORDER matters
+(Zotmoov only moves PDFs that already exist, so fetch them first):
+"In Zotero desktop — Claude can't do these, they're desktop-only. Select the new items (click the
+`added-by-claude` tag in the tag selector, or search it, then Ctrl/Cmd-A):
+ (1) Right-click → **Find Available PDF** (older Zotero: *Find Full Text*) — fetches the missing PDFs.
+     Do this FIRST; Zotero's resolver uses your library proxy and beats any scripted OA fetch (agents
+     get publisher 403s). A few closed-access ones (Science, some Cell/Wiley) may stay PDF-less — grab
+     those via the browser **Zotero Connector** on the article page.
+ (2) THEN, with the items still selected, right-click → **Zotmoov: Move selected to Directory** —
+     relocates the downloaded PDFs into your local linked-file storage."
 
 ## Per-paper notes (prepend pattern)
 One note per paper, titled **"LLM lit-review notes"**, each review prepends a dated block.

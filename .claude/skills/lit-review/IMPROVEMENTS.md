@@ -26,29 +26,6 @@ as the place new work is tracked.
 
 Ranked roughly by value/effort. Ticket IDs are stable so we can reference them.
 
-### UI / review-page (from Denis, 2026-07-02, drosophila-chapter-v2 review)
-
-- **U1 — Hovering navigation bar (always on-screen).** A small fixed/sticky panel visible
-  at all times with:
-  - **"Jump to next undecided paper"** — scrolls to the next row with no decision yet.
-  - **"Jump to top"**.
-  - **Live decision counter**: "Add: N · Discuss: M · Reject: K · Undecided: U / Total T".
-    Updates as choices are made (they already autosave to `decisions.json`).
-  Lives in `templates/review.html` (+ its JS). Should not interfere with the existing
-  top settings bar.
-- **U2 — Visibility filters (show/hide subsets), independent of sorting.** Buttons/toggles
-  that hide rows by state, WITHOUT changing sort order (sorting stays governed by the
-  existing top settings):
-  - only **Add** / only **Discuss** / only **Reject** / only **Undecided**
-  - only **no-abstract** / only **curated** (⭐) / **cross-domain only** (🌐)
-  These are pure client-side visibility filters. Note: a "curated only" and "cross-domain
-  only" grouping already exists as *sort/grouping* buttons — U2 wants them (and the others)
-  as *filters* that can compose with any sort. Keep the distinction clear in the UI.
-
-  Rationale for U1+U2: on a large NEW list (this review had 1860), scanning and re-finding
-  undecided rows is the main friction. These are visualization-only; they must never touch
-  `decisions.json` semantics or the add pipeline.
-
 ### Performance / no-LLM automation
 
 - **A1 — Do the Zotero add + note-attach PROGRAMMATICALLY via the API, not via per-item MCP/agent calls.**
@@ -176,6 +153,32 @@ Ranked roughly by value/effort. Ticket IDs are stable so we can reference them.
 ---
 
 ## Implemented
+
+### 2026-07-05 — U1 floating nav widget + U2 verified (Fable 5, browser-tested)
+- **U1 — always-on-screen floating nav.** New `#navwidget` (fixed bottom-left, so it never collides
+  with `#banner` bottom-center or `#themetoggle` top-right) in `templates/review.html`:
+  **↧ Next undecided** (blue; scrolls to the next undecided row in on-screen/sort order, skipping
+  filtered+decided rows, wraps to top if none below, flashes the target via `.flash` keyframe;
+  auto-disables at 0 undecided), **↥ Top** / **↧ Bottom**, a **live counter** (`N undecided / Total`
+  + `add·disc·rej·coll`), and a **collapse** toggle (`–`/`+`). Counter is refreshed inside the
+  existing `updateCounts()`; "undecided" spans new+owned so it matches what Next-undecided jumps to
+  (the header `#counts` stays new-only — intentional). Visualization-only: never touches
+  decisions.json / the add pipeline.
+- **U2 — already existed (`#filterbar`), now VERIFIED.** The filter bar (All/Undecided/Add/Discuss/
+  Reject/Collection/Curated/Owned/New/No-abstract/Cross-domain) was shipped 2026-07-02. This session
+  confirmed in-browser (claude-in-chrome) that each filter shows the right subset AND — the key U2
+  invariant — **filtering never reorders the list** (DOM order identical before/after; sort and
+  visibility are orthogonal). Add→1, Curated→5 (all curated), Owned→12 (all owned), Cross-domain→3
+  (all discovery), All→reset. No new code needed for U2.
+- **Browser verification (claude-in-chrome, port 8791, 52-row synthetic fixture):** widget renders on
+  load and on resume; making Add/Discuss updates header + widget counters in lockstep; autosave still
+  fires ("✅ Auto-saved (2 decisions)"); Next-undecided scrolls to + flashes the correct next row and
+  skips decided ones; collapse toggles; Next disables when all decided; prior decisions.json restores
+  on reload with widget reflecting it; the D3 `🔗 1 version merged` chip renders. **No console errors**
+  on load or interaction. decisions.json stayed clean (only the 2 real decisions). Lesson from prior
+  sessions honored: verified by DRIVING the page, not grepping — and used the `javascript_tool` DOM
+  probe when screenshot capture (CDP) intermittently timed out, which is more reliable for asserting
+  filter/counter state anyway.
 
 ### 2026-07-05 — D2 + D3 shipped in dedup_verify.py (Fable 5)
 Both are pure-Python, deterministic, browser-independent — unit-tested in isolation (see the test

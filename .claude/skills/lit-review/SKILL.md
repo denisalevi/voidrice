@@ -27,7 +27,13 @@ edits `references.bib`.
    the HTML page. Never present a paper you have not confirmed exists via an API.
 4. **API keys are read at call time, never into context.** OpenAlex key:
    `$(tr -d '\n' < ~/.config/openalex.key)`. Semantic Scholar key (if present):
-   `$(tr -d '\n' < ~/.config/semanticscholar.key)` → `x-api-key` header. Do NOT cat/print keys.
+   `$(tr -d '\n' < ~/.config/semantic-scholar-api.key)` → `x-api-key` header. Do NOT cat/print keys.
+5. **Keep `IMPROVEMENTS.md` current whenever you edit this skill.** `IMPROVEMENTS.md` (in this
+   skill's folder) is the living backlog + change log + rejected-ideas list. If you change ANY file under this skill
+   (scripts, SKILL.md, templates, reference), update `IMPROVEMENTS.md` in the same pass: move the item
+   from Open backlog → Implemented, or add a new Implemented/Rejected entry with the reason. An
+   undocumented skill change is an incomplete change. Read it before proposing "new" improvements —
+   it may already be done or deliberately rejected.
 
 ## Architecture: scripts do the work, you orchestrate
 
@@ -65,14 +71,47 @@ If the request is vague, ask 1–3 questions: topic vs seed-paper mode, timefram
 Name the review (kebab-case, e.g. `engram-drift-mechanisms`) — used for the tag, subcollection,
 and HTML filename. Convert relative dates to absolute.
 
-### 1. Zotero-first — build the KNOWN SET
-Before any web search, find what Denis already has so it can be excluded from the NEW list.
+**Explain the plan up front (before spending budget).** In a few plain sentences, tell Denis how
+this review will work so he can redirect it before tokens are spent:
+- **Ranking is embedding-based** (deterministic cosine similarity of each paper's title+abstract to
+  the review topic) — that drives the sort, not an LLM.
+- **Each paper gets a one-line "what it's about + why relevant to this review" note.** These are
+  written by subagents: **the top ~100 by relevance use Sonnet; the long tail uses Haiku.**
+- **What the split means for quality (say this in one sentence):** *Sonnet gives sharper "core vs.
+  only-adjacent" relevance verdicts and is more honest about weak links; Haiku reliably says what a
+  paper is about and why it's relevant but tends to over-claim relevance and name fewer of the
+  review's specific themes.* Hence Sonnet where discrimination matters most (the top), Haiku for the
+  skim-and-reject tail.
+- **Denis can change the split** — different cutoff (top 50 / 200 / all-Sonnet / all-Haiku), or one
+  model throughout. Offer it; don't assume top-100 is fixed.
+
+### 1. Zotero-first — build the KNOWN SET (broad; serves TWO different jobs — keep them separate)
+Before any web search, find what Denis already has.
 - `zotero_semantic_search` on the topic (semantic recall over his library).
 - `zotero_search_items` with short `Author Year` / keyword queries (substring match — keep queries
   SHORT; more words = stricter, not broader).
 - For seed-paper mode, resolve the seed in Zotero if present.
-Record each hit's DOI + normalized title+first-author+year → the KNOWN SET. These become the
-"Already in your Zotero" section (context only, no action).
+Record each hit's DOI + normalized title+first-author+year + **abstract + zotero item key** → the KNOWN SET.
+
+**The known-set does two jobs; do NOT conflate them (this bit us — see D4):**
+- **Job A — EXCLUSION (dedup).** Keep the known-set BROAD/over-inclusive so nothing Denis already owns
+  gets re-presented as a "new" paper. Loosely-related is fine here.
+- **Job B — INCLUSION (collection membership).** The review collection should contain only the owned
+  papers that are *genuinely relevant*, NOT every loosely-related known-set item. So owned items are
+  **not** auto-added. Instead they flow through the pipeline EXACTLY like new candidates and are
+  rendered in the SAME unified ranked list — one list, not a separate section (see D4-refined). Treat
+  them identically: rank by embedding similarity (§6/rank), Sonnet "why relevant" notes + curation
+  flags, **backfill their missing metadata the same way** (Zotero has no citation counts, so run
+  `scripts/backfill_owned_citedby.py --run <run>` to fetch `cited_by` per DOI from OpenAlex / S2 —
+  same source new candidates use — so owned rows carry a real "cited N×" chip and sort by Citations
+  like anything else), and render each with the identical row renderer. The **only** differences: an
+  extra `📁 in Zotero` chip (`owned:true` on the record) and the action control — owned →
+  **"Add to collection" / "Skip"** (it's already in Zotero, so no new-item add); new →
+  **Add / Discuss / Reject**. Only the owned items Denis picks (`decision:"collection"`) enter the
+  review subcollection; tangential owned items simply sink in the ranking. Isolate them on the page
+  with the `📁 Owned` / `New only` visibility filters or the "hide Owned rows" toggle. (Fetching owned
+  abstracts + full author lists for this: pull them from Zotero via the local API `…/items/<key>`
+  `data.abstractNote` / `data.creators`.)
 
 ### 2. Discover — web candidates
 Use **all available sources** and log which surfaced each paper (provenance). See
@@ -97,6 +136,33 @@ From the strongest seeds (Denis's seed paper, and/or the top candidates):
   bibliographic-coupling (papers sharing the seed's references).
 Loop until a round yields nothing new (loop-until-dry), within reason.
 
+**S2 rate note:** `search.py` and `snowball.py` both use Semantic Scholar and each self-throttle to
+~1.25s, but S2's limit is 1 req/s *cumulative*. Run the S2-using stages SEQUENTIALLY, not as
+overlapping background jobs, or the combined rate trips 429s. (OpenAlex-only stages can overlap.)
+
+### 3b. Cross-domain discovery — OPT-IN (`--discovery`), off by default
+Default sideways discovery is all proximity (nearby vocabulary); it structurally misses "same
+mechanism, different field". Turn this on only when Denis asks for cross-domain / serendipitous
+discovery. It trades precision for reach and is kept bounded so it doesn't add thousands of papers:
+- **Analogy queries (6a).** One small LLM call: "State this seed's core mechanism abstractly and
+  domain-neutrally; name ~5 fields with an isomorphic problem and 2–3 query strings each." Prime it
+  with mechanism categories (drift/reorganization, credit assignment, consolidation, attractor
+  instability, replay-like offline update, memory allocation). Write `{fields:[{field,queries}]}` and
+  run `scripts/discovery.py --run <run> --queries <analogy.json>` — it searches each as a 1-credit
+  title filter, `--max-pages 1`, small `--per-page`, tagging every hit `origin:"cross-domain"` +
+  `discovery:{field,query}`. Ceiling ≈ per_page × #queries (~a few hundred raw), not thousands.
+- **Concept-abstracted retrieval (6b).** Write domain-neutral rephrasings of the seed's contribution
+  (vocabulary stripped) to a JSON list and pass `rank.py --concept-file <f>`. It builds a second
+  "conceptual resonance" centroid; cross-domain candidates are scored on `max(topic_sim, concept_sim)`
+  so remote-but-relevant papers aren't buried under nearest-neighbors. Writes `concept_sim` per paper.
+- **Volume control (the key question).** Cross-domain candidates flow through the normal
+  dedup/verify/rank. Then KEEP ONLY the top ~40 cross-domain by rank_score and drop the rest (past the
+  top slice they're noise) — `log()` how many were dropped. Give that top slice **Sonnet** "why
+  relevant" notes (they're the surprising ones that most need explaining, and Sonnet's cross-domain
+  judgment is sharper); the dropped tail gets no notes because it's not on the page. Net: ~40 tagged,
+  Sonnet-noted, separately-groupable papers — bounded and cheap. On the page they carry a
+  `🌐 cross-domain` chip and are reachable via the "Cross-domain only" grouping button.
+
 ### 4. Dedup against the KNOWN SET — the core step
 Compute `{candidates} − {Zotero}`:
 - **DOI exact match** (normalized, lowercase) = authoritative → already-owned, exclude from NEW.
@@ -111,70 +177,132 @@ Result: three buckets — Already-in-Zotero, NEW candidates, Uncertain.
 - **Retraction/quality check:** `scite_enrich_item(doi=…)` → surface retraction alerts +
   support/contrast counts on the HTML page. A retracted paper must be flagged prominently.
 
-### 6. Present — interactive HTML review page(s)
-Render `templates/review.html` filled with the three buckets. Each NEW/Uncertain paper row must
-have: full author list, foldable abstract, `doi.org/<doi>` hyperlink (fallback to best available
-URL if no DOI), source-provenance chip(s), verification + retraction status, a free-text note
-field, and a per-paper choice (add / discuss / reject). Include top-level "select all add / none"
-buttons and a header with the search log + credit spend.
+### 6. Relevance notes → audit → ONE interactive page
 
-**Curating never hides the full set — always present BOTH.** Ranking/curation is a convenience,
-not a filter Denis is stuck with: the final judgement of what is relevant is his. So whenever you
-narrow a large discovery set to a curated shortlist, you MUST also produce a page with the FULL
-ranked set (everything not already in his Zotero, highest-relevance first, no-abstract items
-appended). Never present only the curated view. Lay them out as sibling subfolders so each page
-gets its own `decisions.json` (the page always POSTs to `decisions.json`, so two pages in one
-folder would clobber each other):
+**Order matters: notes FIRST, then you audit from the notes.** This is deliberately not redundant.
+The per-paper notes are the durable user-facing artifact; your audit reads the *distilled notes*
+(~20 words each), not the raw abstracts, so it is cheap (one pass over ~30K tokens, not 600K+ of
+abstracts) and better-targeted than re-reading everything.
 
-- `literature-reviews/<review-name>/curated/<review-name>.html`  ← curated shortlist
-- `literature-reviews/<review-name>/full/<review-name>.html`     ← full ranked set
+**6a. Generate per-paper relevance notes (subagents, Sonnet/Haiku split).** For every NEW/Uncertain
+candidate WITH an abstract, generate one grounded sentence: *what the paper is about AND why it is
+relevant to THIS review question* (≤30 words; honest about weak links; no invented findings; tie to
+the review's specific themes where possible). Fan out via `Workflow` (or `Agent`), returning
+`{id, why_relevant}` via schema, keyed by DOI. **Top ~100 by relevance → `model:'sonnet'`; the tail
+→ `model:'haiku'`** (see §0 for what the split means; honor any cutoff Denis chose). Papers with NO
+abstract get no note (title only — don't hallucinate). Reuse existing notes: if a paper already has
+a Sonnet note, don't regenerate it with Haiku. Write the merged `{id: note}` map to disk and merge
+it into `classified.json` as a `relevance` field per candidate.
 
-If the discovery set is already small enough to review whole (no curation needed), a single
-`full/` page is fine — say so. Give each page a distinct `--name` (e.g. `… (CURATED · N)` vs
-`… (FULL · all ranked)`) and cross-reference them in each page's `--search-log` so Denis knows
-the other exists.
+**Batching: ~40 papers per subagent** (default; validated as reliable — Haiku rarely drops items at
+this size). Prep the batches with `scripts/notes_todo.py` (it emits ONLY papers still missing a note
+— honoring "reuse existing notes" — truncates each abstract to ~900 chars to cut re-billed context,
+and can split into batch files; `--top N` limits to the top-N ranked + all curated). One-shot each
+agent: paste the batch data INLINE and instruct "emit only the schema JSON in one turn, no tool
+calls, no file reads" (a file read is an extra billed turn). Run a small cleanup Agent for any
+stragglers (compare returned ids to the batch; re-note the missing few). Then join the `{id: note}`
+map into `classified.json` with `scripts/merge_fields.py --run <run> --map <notes.json>` — it matches
+by DOI *and* by candidate-id (so no-DOI papers merge too) and REPORTS matched/unmatched so a slipped
+merge is loud, not a silently empty page.
 
-**Serve every page you produce and hand Denis the links.** A `file://` page can't auto-save
-decisions, so always serve — never just hand over a path. Run `scripts/serve.py --dir <subfolder>
-[--port <p>]` in the BACKGROUND, one server per subfolder (different ports). `serve.py` falls back
-to a random free port if the requested one is taken, so DO NOT trust the port you asked for —
-read the actual `OPEN: http://127.0.0.1:<port>/…` line from each server's log and `curl` it to
-confirm HTTP 200 before quoting it. Then show Denis a short labelled list of the live links, e.g.:
-- **Curated (N):** http://127.0.0.1:<port>/<review-name>.html
-- **Full (all ranked):** http://127.0.0.1:<port>/<review-name>.html
+Cost note (measured): each note-agent re-bills its whole transcript every turn (LLMs are stateless
+per call) and agents took ~4 turns each, so cost ≈ `agents × (fixed_load≈15K + batch_data × turns)`.
+Only the ~15K fixed load (system prompt + tool schemas) is truly per-agent; the bulk is batch-data
+re-billed per turn and scales with total papers, NOT batch size — so making batches fatter saves
+only the fixed portion (~20–35%) while making each agent's transcript longer, and Denis prefers the
+validated 40. The real lever if cost ever matters is fewer TURNS (prompt agents to read-and-emit in
+one shot), not bigger batches. Speed is irrelevant to token cost. Most re-billed context is
+cache-read (~10% of input rate), so $ saving < raw-token saving; on token-quota plans raw tokens =
+headroom.
 
-Tell Denis to open the link(s), make choices, and write notes. Served pages **auto-save** each
-choice to `decisions.json` in that subfolder — no button needed. (Only if he opens a bare
-`file://` page does he need the 💾 Save button, which downloads `decisions.json` for him to move
-into the folder.) He reviews whichever page(s) he likes; decisions from BOTH are honoured at add
-time (step 7 reads every `decisions.json` under the review folder and unions them, deduping by DOI).
+**6b. YOU audit the notes and set flags + curated.** Read ALL the `relevance` notes (cheap) and,
+per paper, set:
+- `curated: true` for the papers genuinely on-topic for the review — this REPLACES any earlier
+  top-slice curation; re-derive it from the full notes so recall isn't limited to what you skimmed.
+- `audit` flags (array), at minimum: `duplicate` (preprint↔published or near-dup — name the twin),
+  `off-topic` / `over-claimed` (note oversells a weak link — common with Haiku), `core` (touches the
+  review's specific novelty — the must-reads). Carry through any retraction/editorial-notice concern.
+Write these back into `classified.json` via `merge_fields.py` (same DOI/cid-keyed merge as the notes),
+not by hand. `build_html.py` renders `curated`→⭐ chip, `audit` flags→chips, `duplicate` etc. Keep it
+honest and conservative — `curated` is a suggestion, the final call is Denis's, which is why the full
+set stays on the page.
+
+**6c. Retraction enrichment.** Run `scite_enrich_item(doi=…)` on candidates (at least the curated +
+top ones), write a `retraction` field for anything flagged. A retracted paper must be flagged
+prominently.
+
+**6d. Build ONE page (no more separate curated/full pages).** FIRST backfill owned citation counts:
+`python3 scripts/backfill_owned_citedby.py --run <run>` (fills `cited_by` on the `known` bucket from
+OpenAlex/S2 by DOI, so owned rows aren't a Citations-sort no-op). Then render `templates/review.html`
+from `classified.json` with `build_html.py`. **Owned (in-Zotero) items are merged INTO the single
+ranked list** and render with the identical row renderer as new candidates — same full authors,
+**"why relevant"** fold (open by default), foldable **abstract**, **provenance** fold, link,
+relevance score, `cited N×`, `⭐` — the ONLY additions being a `📁 in Zotero` chip and an
+**"Add to collection" / "Skip"** action instead of Add/Discuss/Reject (build_html keys this off
+`owned:true`). New rows show verification + retraction + audit chips too. **Uncertain /
+possible-duplicate rows render in their OWN section with Discuss/Reject only — no Add button even if
+they have a DOI** (safety boundary). No-DOI rows likewise get Discuss/Reject only. The unified list
+defaults to **relevance sort + curated-first grouping**, with grouping buttons **"⭐ Curated first" /
+"Mix all" / "🌐 Cross-domain only"** and Relevance/Citations/Mix/Custom sorts that order owned and new
+rows together. Visibility filters (incl. `📁 Owned`, `New only`, "hide Owned rows") isolate subsets
+without changing sort. No-abstract items are appended in their own section. (build_html handles all of
+this; you just supply `classified.json` + run the backfill first.)
+
+**6e. Serve it and hand Denis the link.** A `file://` page can't auto-save, so always serve. Run
+`scripts/serve.py --dir <review-folder> [--port <p>]` in the BACKGROUND. `serve.py` falls back to a
+random free port if the requested one is taken, so DO NOT trust the port you asked for — read the
+actual `OPEN: http://127.0.0.1:<port>/…` line from the log and `curl` it (expect 200) before quoting
+it. Give Denis the one link. Served pages **auto-save** each choice to `decisions.json` in the
+folder — no button needed (the 💾 button is only a `file://` fallback that downloads the file).
 
 Then STOP and hand off to Denis. Do not add anything yet.
 
-### 6b. Retraction enrichment (before or after HTML)
-Before adds (and ideally reflected in the HTML), run `scite_enrich_item(doi=…)` on the NEW
-candidates and write a `retraction` field into `classified.json` for any flagged item, then
-re-run `build_html.py` so retraction warnings show. At minimum, retraction-check the papers Denis
-chose to add, and refuse/flag any that are retracted.
-
 ### 7. Add — only after Denis returns his choices
-Read **every** `decisions.json` under the review folder (e.g. `curated/decisions.json` and
-`full/decisions.json`) and UNION them, deduping by normalized DOI. If the same DOI appears in
-both with conflicting decisions, prefer `add` over `discuss` over `reject`, but call out the
-conflict to Denis rather than silently resolving it. For every entry with `decision=="add"`
-(these always have a DOI — the UI only offers Add to DOI-bearing papers; no-DOI papers are
-Discuss/Reject only):
+Read `decisions.json` from the review folder. For every entry with `decision=="add"` (these always
+have a DOI — the UI only offers Add to DOI-bearing papers; no-DOI papers are Discuss/Reject only):
+- **DOI-exact library dedup FIRST (the addable subset only) — the known-set is NOT enough.** The
+  `known_set.json` is built from a few topical searches, so items living elsewhere in Denis's library
+  slip through and get re-added as duplicates (this bit us: 6/50 chosen adds were already owned in the
+  drosophila-chapter-v2 review). Before adding, run an exact-DOI check against the WHOLE library for
+  each chosen-add DOI: `zotero_advanced_search(conditions=[{"field":"DOI","operation":"is","value":<doi>}])`.
+  If PRESENT → do NOT `zotero_add_by_doi`; instead treat it as already-owned (add the existing item to
+  the subcollection, no `added-by-claude` tag). Casing gotcha: Zotero stores mixed-case DOIs, so on a
+  "No items found", retry once lowercased and once with common casing (e.g. `10.7554/eLife.NNNN`) before
+  concluding MISSING. This is a mechanical tool-call loop with a deterministic verdict — **delegate it to
+  a Haiku subagent** (validated cheap: ~24k tokens for 17 DOIs). See ticket D1 in `IMPROVEMENTS.md`.
+- **Resolve each surviving (MISSING) DOI before adding.** The verify-by-source fast path marks
+  trusted-index DOIs verified for *display* without resolving them; before an irreversible Zotero add,
+  confirm the DOI actually resolves — batched HEAD/GET to `https://doi.org/<doi>` or
+  `https://api.crossref.org/works/<doi>` (200/3xx = real). This is only the handful Denis chose to add,
+  so it's cheap; skip/flag any that 404 rather than adding a dead DOI. (Do NOT bulk-resolve all
+  candidates — only the chosen adds.)
 - Ensure the review subcollection exists: `zotero_create_collection("<review-name>",
   parent_collection="2S432WWF")` (parent `LLM-literature-reviews` = key `2S432WWF`).
 - `zotero_add_by_doi(doi, collections=<subcollection key>,
   tags=["added-by-claude", "lit-review/<review-name>"], attach_mode="none")`.
   `attach_mode="none"` = metadata only, NO cloud PDF (protects the Zotmoov flow).
 - Add the per-paper note (see below).
-- Also add the **already-owned** papers for this review to the subcollection (so it is the
-  complete picture of the review) via `zotero_manage_collections`.
-After the batch, print: (a) a summary of what was added, (b) the explicit **desktop PDF step**:
-"In Zotero, select the newly added items (tag `added-by-claude`) → right-click → *Zotmoov:
-Move selected to Directory* to fetch/relocate PDFs locally." (No API hook exists for this.)
+- **REQUIRED — populate the collection with the already-owned items Denis CHOSE, so it is the COMPLETE
+  picture of the review.** Owned items now flow through the page exactly like new ones and are judged
+  per-paper, so membership follows Denis's choices, NOT a blanket add-the-whole-known-set: add every
+  decisions.json entry with `owned:true` AND `decision:"collection"` (identified by `zkey` / `doi`),
+  PLUS any chosen-add that the DOI-exact dedup found already owned. Use
+  `zotero_manage_collections(item_keys=[...chosen owned zkeys + owned-adds...], add_to=<subcollection key>)`
+  — chunk into groups of ~25. **These are membership-only: the existing items are NOT re-added as new
+  items, get NO new tags, and specifically must NOT get `added-by-claude` or `lit-review/<review-name>`.**
+  Only the genuinely-new papers carry those tags. (`decision:"skip"` or undecided owned items are left
+  out — that per-paper judgement is the point of the redesign; adding to a collection is trivially
+  reversible, so if Denis was clearly permissive you can flag borderline ones, but default to his
+  choices.) After doing it, VERIFY: paginate the collection (`/collections/<key>/items/top`, default
+  page is 100 — read the `Total-Results` header, don't trust one page) and confirm zero owned items
+  carry `added-by-claude`.
+After the batch, print: (a) a summary of what was added (new items) vs. added-to-collection (owned),
+(b) the explicit **desktop PDF steps** (no API hook exists for either — they are desktop-UI only; see
+tickets A2/A3):
+"In Zotero: (1) select the new items (tag `added-by-claude`) → right-click → *Find Full Text* to fetch
+PDFs (its browser-session + your library proxy beats any scripted OA fetch — agents get publisher 403s);
+(2) then right-click → *Zotmoov: Move selected to Directory* to relocate PDFs into your local linked
+storage. Manually grab any the resolver misses via the browser Zotero Connector."
 
 ## Per-paper notes (prepend pattern)
 One note per paper, titled **"LLM lit-review notes"**, each review prepends a dated block.

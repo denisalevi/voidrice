@@ -4,7 +4,7 @@ Design: scripts do the mechanical I/O and write introspectable output to a RUN D
 orchestrating LLM can poll files instead of re-running work. Everything logs to run.log
 (timestamped, leveled) AND updates a machine-readable *_summary.json.
 """
-import json, os, sys, time, random, re, urllib.parse, datetime as dt
+import json, os, sys, time, random, re, threading, urllib.parse, datetime as dt
 from pathlib import Path
 
 try:
@@ -42,24 +42,76 @@ class Log:
     def error(self, m): self._w("ERROR", m)
     def ok(self, m):    self._w("OK", m)
 
+# ---------- Retry-After parsing (numeric seconds OR HTTP-date) ----------
+def _retry_after_seconds(ra):
+    """Return seconds to wait from a Retry-After header, or None if unparseable.
+    Handles both numeric ('120') and HTTP-date ('Wed, 21 Oct 2026 07:28:00 GMT') forms."""
+    if not ra:
+        return None
+    ra = ra.strip()
+    if ra.isdigit():
+        return float(ra)
+    try:
+        from email.utils import parsedate_to_datetime
+        when = parsedate_to_datetime(ra)
+        if when is None:
+            return None
+        # tz-aware vs naive: compare in UTC
+        nowdt = dt.datetime.now(when.tzinfo) if when.tzinfo else dt.datetime.now()
+        return max(0.0, (when - nowdt).total_seconds())
+    except Exception:
+        return None
+
+# ---------- Per-host rate limiter (shared across threads) ----------
+class HostRateLimiter:
+    """Thread-safe per-hostname minimum-interval gate. Lets many hosts run in parallel
+    while keeping any single host (esp. Semantic Scholar) under its cumulative rate limit."""
+    def __init__(self, default_interval=0.0, per_host=None):
+        self.default = default_interval
+        self.per_host = per_host or {}
+        self._last = {}
+        self._locks = {}
+        self._guard = threading.Lock()
+    def _host(self, url):
+        try: return urllib.parse.urlparse(url).hostname or ""
+        except Exception: return ""
+    def wait(self, url):
+        host = self._host(url)
+        interval = self.per_host.get(host, self.default)
+        if interval <= 0:
+            return
+        with self._guard:
+            lock = self._locks.setdefault(host, threading.Lock())
+        with lock:
+            last = self._last.get(host, 0.0)
+            gap = interval - (time.time() - last)
+            if gap > 0:
+                time.sleep(gap)
+            self._last[host] = time.time()
+
 # ---------- HTTP with backoff + rate limiting ----------
 class Http:
     """GET/POST with 429/5xx exponential backoff + full jitter, Retry-After honored,
     and a minimum inter-request interval (self-throttle). Tracks request counts."""
-    def __init__(self, log, min_interval=0.0, max_retries=5, base=1.0, cap=60.0, source="http"):
+    def __init__(self, log, min_interval=0.0, max_retries=5, base=1.0, cap=60.0, source="http",
+                 host_limiter=None):
         self.log = log; self.min_interval = min_interval; self.max_retries = max_retries
         self.base = base; self.cap = cap; self.source = source
+        self.host_limiter = host_limiter  # optional shared HostRateLimiter (per-host, thread-safe)
         self._last = 0.0; self.n_requests = 0; self.n_429 = 0
         self.s = requests.Session()
         self.s.headers["User-Agent"] = f"lit-review/1.0 (mailto:{MAILTO})"
-    def _throttle(self):
+    def _throttle(self, url=None):
+        # per-host shared gate first (keeps S2 ≤1 req/s across all workers), then the local interval
+        if self.host_limiter and url:
+            self.host_limiter.wait(url)
         if self.min_interval:
             wait = self.min_interval - (time.time() - self._last)
             if wait > 0: time.sleep(wait)
     def request(self, method, url, headers=None, json_body=None, timeout=20):
         allow_redirects = method != "HEAD"  # HEAD: don't follow, a 3xx already proves existence
         for attempt in range(self.max_retries + 1):
-            self._throttle()
+            self._throttle(url)
             try:
                 r = self.s.request(method, url, headers=headers, json=json_body,
                                    timeout=timeout, allow_redirects=allow_redirects)
@@ -74,7 +126,10 @@ class Http:
                 if attempt == self.max_retries:
                     self.log.error(f"[{self.source}] {r.status_code} exhausted retries for {url[:90]}"); return r
                 ra = r.headers.get("Retry-After")
-                delay = float(ra) if (ra and ra.isdigit()) else min(self.cap, self.base * 2**attempt) + random.random()
+                delay = _retry_after_seconds(ra)
+                if delay is None:
+                    delay = min(self.cap, self.base * 2**attempt) + random.random()
+                delay = min(delay, self.cap)
                 self.log.warn(f"[{self.source}] {r.status_code}; backoff {delay:.1f}s (attempt {attempt+1})")
                 time.sleep(delay); continue
             return r
@@ -84,10 +139,15 @@ class Http:
 
 # ---------- OpenAlex helpers ----------
 def oa_credit_cost(url):
-    """Rough credit accounting: search= is 10, any filter/facet is 1, single-record fetch is free."""
+    """Rough credit accounting: search= is 10, any filter/facet is 1, single-record fetch is free.
+    filter=openalex_id: is ID HYDRATION (fetching known records by id) → FREE, not a 1-credit query,
+    even though it's batched via the /works?filter= endpoint. Not excluding it over-reports credits
+    for citation-heavy reviews (backward snowball hydrates many refs this way)."""
     if "/works/" in url.split("?")[0] and "filter=" not in url:  # single record by id/doi
         return 0
     q = urllib.parse.urlparse(url).query
+    if "filter=openalex_id" in q or "filter=ids.openalex" in q:  # id hydration, free
+        return 0
     if "search=" in q: return 10
     if "filter=" in q or "group_by=" in q: return 1
     return 10  # bare list default
@@ -131,10 +191,11 @@ def first_author_surname(authors):
 
 # ---------- candidate record (unified shape across sources) ----------
 def candidate(doi=None, title="", authors=None, year=None, venue="", abstract="",
-              cited_by=None, source="", url="", extra=None):
+              cited_by=None, source="", url="", extra=None, arxiv=None, pmid=None):
     return {
         "doi": norm_doi(doi), "title": title, "authors": authors or [], "year": year,
         "venue": venue, "abstract": abstract, "cited_by": cited_by,
+        "arxiv": arxiv or None, "pmid": pmid or None,
         "sources": [source] if source else [], "url": url, "extra": extra or {},
     }
 

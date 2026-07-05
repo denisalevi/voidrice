@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """snowball.py — expand from seed papers via the citation graph.
 
-  forward  : papers that CITE the seed (derivative work)     [OpenAlex cites: + S2 citations]
-  backward : the seed's REFERENCES (foundations)             [OpenAlex referenced_works + S2 references]
+  forward  : papers that CITE the seed (derivative work)     [OpenAlex filter=cites:]
+  backward : the seed's REFERENCES (foundations)             [OpenAlex referenced_works, id-hydrated]
   sideways : thematic siblings                               [S2 Recommendations API]
 
 Appends to <run>/raw_candidates.jsonl, updates <run>/snowball_summary.json. Poll-friendly logs.

@@ -73,6 +73,7 @@ def _s2_emit(run, w, q):
         year=w.get("year"), venue=w.get("venue",""), abstract=w.get("abstract") or "",
         cited_by=w.get("citationCount"), source="s2",
         url=("https://doi.org/"+ext["DOI"]) if ext.get("DOI") else "",
+        arxiv=ext.get("ArXiv"), pmid=ext.get("PubMed"),
         extra={"query": q.get("label"), "arxiv": ext.get("ArXiv"), "pmid": ext.get("PubMed")}))
 
 def s2_run(http, log, run, q, per_page, max_pages, key, summ):

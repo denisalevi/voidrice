@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <!--
   lit-review review page — Denis's approval interface.
-  HOW THE SKILL USES THIS TEMPLATE:
-    1. Replace {{REVIEW_NAME}}, {{GENERATED}}, {{SEARCH_LOG}}, {{CREDIT_SPEND}}.
-    2. Replace {{ROWS_NEW}}, {{ROWS_UNCERTAIN}}, {{ROWS_KNOWN}} with <article class="paper"> blocks
-       (see the commented example at the bottom of this file for the exact structure).
-    3. Write to literature-reviews/<review-name>/<review-name>.html.
+  HOW THE SKILL USES THIS TEMPLATE (via build_html.py):
+    - Fills {{REVIEW_NAME}}, {{GENERATED}}, {{ELAPSED}}, {{SEARCH_LOG}}, {{CREDIT_SPEND}},
+      {{COUNT_*}} and the {{ROWS_*}} sections with <article class="paper"> blocks.
+    - Written to literature-reviews/<review-name>/<review-name>.html and SERVED by serve.py.
   HOW DENIS USES IT:
-    - Open in a browser. For each paper click Add / Discuss / Reject; optionally type a note.
-    - Click "Save decisions" — it writes the choices back into THIS file's data-* attributes AND
-      shows a summary block you can copy. Save the file (Ctrl+S) to persist. Then tell Claude it's ready.
+    - Open the localhost link. For each paper click Add / Discuss / Reject; optionally type a note.
+    - Choices AUTO-SAVE to decisions.json in the review folder (served page POSTs to /save on every
+      change — no button to press). A prior decisions.json auto-loads on open, so he can stop and
+      resume. (Bare file:// only: no autosave; a 💾 fallback button downloads decisions.json instead.)
   HOW THE SKILL READS IT BACK:
-    - Re-read the saved file; each <article class="paper"> has data-decision (add|discuss|reject|none),
-      data-doi, and data-note. Parse those. Only data-decision="add" papers are added to Zotero.
+    - Read decisions.json: a list of {decision, doi, cid, title, note}. Only decision=="add" (always
+      DOI-bearing — the UI offers Add only on DOI-bearing NEW rows) is added to Zotero.
 -->
 <html lang="en">
 <head>
@@ -21,7 +21,13 @@
 <title>lit-review · {{REVIEW_NAME}}</title>
 <style>
   :root{--add:#1f883d;--discuss:#9a6700;--reject:#cf222e;--bg:#fff;--fg:#1f2328;--mut:#656d76;--line:#d0d7de;--card:#f6f8fa;}
-  @media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--line:#30363d;--card:#161b22;}}
+  /* dark palette shared by system-pref and explicit choice */
+  @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--line:#30363d;--card:#161b22;}}
+  :root[data-theme=dark]{--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--line:#30363d;--card:#161b22;}
+  :root[data-theme=light]{--bg:#fff;--fg:#1f2328;--mut:#656d76;--line:#d0d7de;--card:#f6f8fa;}
+  #themetoggle{position:fixed;top:10px;right:12px;z-index:50;cursor:pointer;border:1px solid var(--line);
+    background:var(--card);color:var(--fg);border-radius:6px;padding:5px 10px;font-size:12.5px;line-height:1}
+  #themetoggle:hover{border-color:var(--mut)}
   *{box-sizing:border-box}
   body{font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
   header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 20px}
@@ -37,6 +43,8 @@
   .paper[data-decision=add]{border-left:4px solid var(--add)}
   .paper[data-decision=discuss]{border-left:4px solid var(--discuss)}
   .paper[data-decision=reject]{border-left:4px solid var(--reject);opacity:.7}
+  .paper[data-decision=collection]{border-left:4px solid #0969da}
+  .paper[data-decision=skip]{border-left:4px solid var(--line);opacity:.7}
   .ptitle{font-weight:600;font-size:15.5px;margin:0 0 4px}
   .ptitle a{color:inherit;text-decoration:none;border-bottom:1px dotted var(--mut)}
   .authors{color:var(--mut);font-size:13px;margin:2px 0}
@@ -47,13 +55,20 @@
   details.abs{margin:6px 0}
   details.abs summary{cursor:pointer;color:var(--mut);font-size:13px}
   details.abs p{margin:6px 0 0;font-size:13.5px;color:var(--fg)}
+  details.rel{margin:6px 0;border-left:3px solid var(--add);padding-left:9px}
+  details.rel summary{cursor:pointer;color:var(--add);font-size:13px;font-weight:600}
+  details.rel p{margin:6px 0 0;font-size:13.5px;color:var(--fg)}
+  details.prov{margin:4px 0}
+  details.prov summary{cursor:pointer;color:var(--mut);font-size:12px}
+  details.prov ul{margin:4px 0 0 16px;font-size:12px;color:var(--mut)}
   .choice{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap}
   .choice button{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:5px 12px;font-size:13px}
   .choice button.sel[data-c=add]{background:var(--add);color:#fff;border-color:var(--add)}
   .choice button.sel[data-c=discuss]{background:var(--discuss);color:#fff;border-color:var(--discuss)}
   .choice button.sel[data-c=reject]{background:var(--reject);color:#fff;border-color:var(--reject)}
+  .choice button.sel[data-c=collection]{background:#0969da;color:#fff;border-color:#0969da}
+  .choice button.sel[data-c=skip]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
   .note{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);padding:6px 8px;font:13px inherit;resize:vertical;min-height:34px}
-  .known .paper{opacity:.85}
   #banner{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:100;max-width:80%;
     padding:10px 16px;border-radius:8px;font-size:13.5px;box-shadow:0 4px 16px rgba(0,0,0,.25);display:none}
   #banner.show{display:block}
@@ -65,16 +80,63 @@
   #intro li{margin:3px 0}
   #intro code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
   .sortbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
-  .sortbtn{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 10px;font-size:12.5px}
+  .sortbtn,.grpbtn{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 10px;font-size:12.5px}
   .sortbtn.sel{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  .grpbtn.sel{background:var(--add);color:var(--bg);border-color:var(--add)}
+  /* Stacked sticky bars: header sticks at 0, filterbar below the header, sortbar2 below the filterbar.
+     --hdr-h / --flt-h are measured by JS (updateStickyOffsets) so wrapping on narrow widths is handled. */
+  #filterbar{position:sticky;top:var(--hdr-h,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:6px;flex-wrap:wrap}
+  .fltbtn{cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 10px;font-size:12.5px}
+  .fltbtn.sel{background:#0969da;color:#fff;border-color:#0969da}
+  .paper.filtered{display:none !important}
+  section.filtered{display:none !important}
+  body.hide-owned .paper[data-owned="1"]{display:none !important}
   #customsort{width:100%;gap:6px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12.5px;margin-top:6px}
   #customsort input,#customsort select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
+  /* U1: always-on-screen floating nav (jump controls + live decision counter). Fixed bottom-left
+     so it never collides with the #banner (bottom-center) or #themetoggle (top-right). */
+  #navwidget{position:fixed;left:14px;bottom:14px;z-index:90;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.18);padding:8px 10px;font-size:12px;min-width:180px;max-width:240px}
+  #navwidget .nvrow{display:flex;gap:6px;margin-bottom:6px}
+  #navwidget button{flex:1;cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);
+    border-radius:6px;padding:5px 6px;font-size:12px;line-height:1.2}
+  #navwidget button:hover{border-color:var(--mut)}
+  #navwidget #nvnext{background:#0969da;color:#fff;border-color:#0969da;font-weight:600}
+  #navwidget #nvnext:disabled{background:var(--card);color:var(--mut);border-color:var(--line);font-weight:400;cursor:default}
+  #navwidget .nvcounts{color:var(--mut);line-height:1.5;font-variant-numeric:tabular-nums}
+  #navwidget .nvcounts b{color:var(--fg);font-weight:600}
+  #navwidget #nvcollapse{position:absolute;top:4px;right:6px;flex:none;padding:0 5px;font-size:12px;background:none;border:none;color:var(--mut)}
+  #navwidget.collapsed .nvrow,#navwidget.collapsed .nvcounts{display:none}
+  #navwidget.collapsed{min-width:0;max-width:none;padding:4px 8px}
+  .paper.flash{animation:flashrow 1.2s ease-out}
+  @keyframes flashrow{0%{box-shadow:0 0 0 3px #0969da}100%{box-shadow:none}}
 </style>
 </head>
 <body>
+<button id="themetoggle" onclick="cycleTheme()" title="Toggle light / dark theme">☀ Light</button>
+<script>
+  // Light/Dark only. First load: detect OS preference once and use it as the initial value.
+  // Thereafter the explicit choice is stored in localStorage.
+  (function(){
+    var t=null; try{t=localStorage.getItem('litrev-theme');}catch(e){}
+    if(t!=='light'&&t!=='dark'){
+      t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light';
+    }
+    document.documentElement.setAttribute('data-theme',t);   // always explicit now
+  })();
+  function currentTheme(){return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';}
+  function setThemeBtn(t){var b=document.getElementById('themetoggle'); if(b) b.textContent=(t==='dark'?'🌙 Dark':'☀ Light');}
+  function cycleTheme(){
+    var next=currentTheme()==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    try{localStorage.setItem('litrev-theme',next);}catch(e){}
+    setThemeBtn(next);
+  }
+  document.addEventListener('DOMContentLoaded',function(){setThemeBtn(currentTheme());});
+</script>
 <header>
   <h1>Literature review · {{REVIEW_NAME}}</h1>
-  <div class="meta">Generated {{GENERATED}} · took {{ELAPSED}} · Sources: {{SEARCH_LOG}} · OpenAlex credits: {{CREDIT_SPEND}} · {{COUNT_NEW}} ranked + {{COUNT_NOABS}} without abstract</div>
+  <div class="meta">Generated {{GENERATED}} · took {{ELAPSED}} · Sources: {{SEARCH_LOG}} · OpenAlex credits: {{CREDIT_SPEND}} · {{COUNT_NEW}} ranked (incl. {{COUNT_OWNED}} 📁 already in Zotero) + {{COUNT_NOABS}} without abstract</div>
   <div class="bar">
     <button onclick="document.getElementById('new').scrollIntoView()">↧ Ranked ({{COUNT_NEW}})</button>
     <button onclick="document.getElementById('noabs').scrollIntoView()">↧ No-abstract ({{COUNT_NOABS}})</button>
@@ -101,53 +163,161 @@
     </ol>
     <span id="savehint" class="meta"></span>
   </div>
-  <section id="new"><h2>New — missing from your Zotero ({{COUNT_NEW}})</h2>
-    <div class="sortbar">
-      <span class="meta">Sort:</span>
-      <button class="sortbtn" data-sort="similarity" onclick="applySort('similarity',this)">Relevance</button>
-      <button class="sortbtn" data-sort="citations" onclick="applySort('citations',this)">Citations</button>
-      <button class="sortbtn sel" data-sort="mix" onclick="applySort('mix',this)">Mix</button>
-      <button class="sortbtn" data-sort="custom" onclick="showCustom(this)">Custom…</button>
-    </div>
-    <div id="sortinfo" class="meta" style="display:none"></div>
-    <div id="customsort" style="display:none">
-      <label>Take top <input id="topN" type="number" value="100" min="1" style="width:60px"> by
+  <div id="filterbar" class="sortbar">
+    <span class="meta">Show (visibility only — doesn't change sort):</span>
+    <button class="fltbtn sel" data-flt="all" onclick="setFilter('all',this)">All</button>
+    <button class="fltbtn" data-flt="undecided" onclick="setFilter('undecided',this)">Undecided</button>
+    <button class="fltbtn" data-flt="add" onclick="setFilter('add',this)">Add</button>
+    <button class="fltbtn" data-flt="discuss" onclick="setFilter('discuss',this)">Discuss</button>
+    <button class="fltbtn" data-flt="reject" onclick="setFilter('reject',this)">Reject</button>
+    <button class="fltbtn" data-flt="collection" onclick="setFilter('collection',this)">➕ Collection</button>
+    <button class="fltbtn" data-flt="curated" onclick="setFilter('curated',this)">⭐ Curated</button>
+    <button class="fltbtn" data-flt="owned" onclick="setFilter('owned',this)">📁 Owned</button>
+    <button class="fltbtn" data-flt="new" onclick="setFilter('new',this)">New only</button>
+    <button class="fltbtn" data-flt="noabs" onclick="setFilter('noabs',this)">No-abstract</button>
+    <button class="fltbtn" data-flt="discovery" onclick="setFilter('discovery',this)">🌐 Cross-domain</button>
+    <label class="meta" style="margin-left:10px"><input type="checkbox" id="hideOwned" onchange="toggleOwned(this)"> hide Owned rows</label>
+    <span id="fltinfo" class="meta" style="margin-left:10px"></span>
+  </div>
+  <div id="sortbar2" class="sortbar" style="position:sticky;top:calc(var(--hdr-h,0px) + var(--flt-h,0px));z-index:19;background:var(--bg);border-bottom:1px solid var(--line);padding:6px 0;margin-bottom:6px;flex-wrap:wrap">
+    <span class="meta">Sort:</span>
+    <button class="sortbtn sel" data-sort="similarity" onclick="applySort('similarity',this)">Relevance</button>
+    <button class="sortbtn" data-sort="citations" onclick="applySort('citations',this)">Citations</button>
+    <button class="sortbtn" data-sort="mix" onclick="applySort('mix',this)">Mix</button>
+    <button class="sortbtn" data-sort="custom" onclick="showCustom(this)">Custom…</button>
+    <span class="meta" style="margin-left:14px">Grouping:</span>
+    <button class="grpbtn sel" id="grpcur" onclick="setGroup('curated',this)">⭐ Curated first</button>
+    <button class="grpbtn" id="grpmix" onclick="setGroup('mix',this)">Mix all</button>
+    <button class="grpbtn" id="grpdisc" onclick="setGroup('discovery',this)">🌐 Cross-domain only</button>
+    <span id="sortinfo" class="meta" style="display:none;margin-left:10px"></span>
+    <span id="customsort" style="display:none;margin-left:10px">
+      <label>top <input id="topN" type="number" value="100" min="1" style="width:56px"> by
         <select id="primary"><option value="citations">citations</option><option value="similarity" selected>relevance</option></select>,
-        then sort those by
+        then by
         <select id="secondary"><option value="similarity">relevance</option><option value="citations" selected>citations</option></select>
       </label>
       <button onclick="applyCustom()">Apply</button>
-    </div>
+    </span>
+  </div>
+  <section id="new"><h2>Ranked papers ({{COUNT_NEW}}) — incl. {{COUNT_OWNED}} 📁 already in your Zotero</h2>
+    <p class="meta">One relevance-ranked list. Rows tagged <b>📁 in Zotero</b> are already in your library (not re-added) — for those the action is <b>➕ Add to collection</b> / <b>Skip</b>; the rest get <b>Add</b> / <b>Discuss</b> / <b>Reject</b>. Everything else (chips, sort, filter) is identical. Use the <b>📁 Owned</b> / <b>New only</b> filters to isolate either set.</p>
     <div id="newlist">{{ROWS_NEW}}</div>
   </section>
-  <section id="uncertain"><h2>Uncertain / possible duplicate — needs your call</h2>{{ROWS_UNCERTAIN}}</section>
+  <section id="uncertain"><h2>Uncertain / possible duplicate — needs your call ({{COUNT_UNCERTAIN}})</h2>
+    <p class="meta">These fuzzy-matched something already in your Zotero (possible duplicate) — no Add button; Discuss or Reject only.</p>
+    {{ROWS_UNCERTAIN}}</section>
   <section id="noabs"><h2>No abstract available — not content-ranked, shown so you don't miss them ({{COUNT_NOABS}})</h2>
     <p class="meta">These lack an abstract in all sources, so they couldn't be ranked. Click a title to check the paper; decide manually.</p>
     {{ROWS_NOABS}}</section>
-  <section class="known"><h2>Already in your Zotero — context only</h2>{{ROWS_KNOWN}}</section>
 </main>
 <div id="banner"></div>
+<!-- U1: always-on-screen floating nav. Visualization-only — never touches decisions.json. -->
+<div id="navwidget">
+  <button id="nvcollapse" onclick="toggleNav()" title="Collapse / expand">–</button>
+  <div class="nvrow">
+    <button id="nvnext" onclick="jumpNextUndecided()" title="Scroll to the next paper with no decision yet">↧ Next undecided</button>
+  </div>
+  <div class="nvrow">
+    <button onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↥ Top</button>
+    <button onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})" title="Jump to bottom">↧ Bottom</button>
+  </div>
+  <div class="nvcounts" id="nvcounts"></div>
+</div>
 <script>
   function papers(){return[...document.querySelectorAll('.paper[data-doi]')]}
   function choose(el,c){
     const p=el.closest('.paper');p.dataset.decision=c;
     p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));
-    updateCounts(); queueSave();
+    updateCounts(); queueSave(); applyFilterToRow(p);
   }
-  function setAll(c){papers().forEach(p=>{if(!p.closest('.known')){p.dataset.decision=c;
-    p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));}});updateCounts(); queueSave();}
+  // ---- Visibility filters (does NOT affect sort order) ----
+  let activeFilter='all';
+  function rowMatches(p,f){
+    if(f==='all')return true;
+    const owned=p.dataset.owned==='1', noabs=!!p.closest('#noabs');
+    const d=p.dataset.decision||'none';
+    if(f==='owned')return owned;
+    if(f==='new')return !owned && !noabs && !p.closest('#uncertain');
+    if(f==='noabs')return noabs;
+    if(f==='curated')return p.dataset.curated==='1';
+    if(f==='discovery')return p.dataset.discovery==='1';
+    if(f==='undecided')return d==='none';
+    return d===f; // add | discuss | reject | collection | skip
+  }
+  function applyFilterToRow(p){ p.classList.toggle('filtered', !rowMatches(p,activeFilter)); }
+  function setFilter(f,btn){
+    activeFilter=f;
+    document.querySelectorAll('.fltbtn').forEach(b=>b.classList.toggle('sel',b===btn));
+    papers().forEach(applyFilterToRow);
+    // hide a section entirely if it has no visible rows
+    document.querySelectorAll('main > section').forEach(s=>{
+      const any=[...s.querySelectorAll('.paper')].some(p=>!p.classList.contains('filtered'));
+      if(s.querySelector('.paper')) s.classList.toggle('filtered', !any);
+    });
+    const shown=papers().filter(p=>!p.classList.contains('filtered')).length;
+    const info=document.getElementById('fltinfo');
+    if(info) info.textContent = f==='all' ? '' : `showing ${shown} “${btn?btn.textContent.trim():f}” — click All to reset`;
+    // Jump to the first still-visible section so the user isn't left staring at a collapsed empty list.
+    if(f!=='all'){
+      const firstSec=[...document.querySelectorAll('main > section')].find(s=>!s.classList.contains('filtered') && s.querySelector('.paper:not(.filtered)'));
+      if(firstSec) firstSec.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }
+  // Owned rows now live INTERLEAVED in the ranked list, so "hide Owned" hides those rows in place
+  // (via a body class + CSS) rather than hiding a separate section.
+  function toggleOwned(cb){ document.body.classList.toggle('hide-owned', cb.checked); }
+  function hasChoice(p,c){return !!p.querySelector('.choice button[data-c="'+c+'"]');}
+  function setAll(c){papers().forEach(p=>{
+    if(p.dataset.owned==='1')return;  // owned rows have collection/skip, not add/reject — leave them
+    // 'add' only applies to papers that actually have an Add button (DOI-bearing NEW rows).
+    // No-DOI and uncertain/possible-dup rows have no Add button → leave them untouched.
+    if(c==='add' && !hasChoice(p,'add'))return;
+    p.dataset.decision=c;
+    p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===c));
+  });updateCounts(); queueSave();}
   function updateCounts(){
     const c={add:0,discuss:0,reject:0,none:0};
-    papers().forEach(p=>{if(!p.closest('.known'))c[p.dataset.decision||'none']++});
-    document.getElementById('counts').textContent=`add ${c.add} · discuss ${c.discuss} · reject ${c.reject} · undecided ${c.none}`;
+    papers().forEach(p=>{if(p.dataset.owned!=='1')c[p.dataset.decision||'none']++});
+    // owned rows: count 'collection' choices separately
+    let coll=0, ownedNone=0;
+    document.querySelectorAll('.paper[data-owned="1"]').forEach(p=>{
+      const d=p.dataset.decision||'none';
+      if(d==='collection')coll++; if(d==='none')ownedNone++;
+    });
+    document.getElementById('counts').textContent=`add ${c.add} · discuss ${c.discuss} · reject ${c.reject} · undecided ${c.none} · +collection ${coll}`;
+    // U1: mirror into the floating widget. "Undecided" spans new + owned so it matches "Next undecided".
+    const total=papers().length, undecided=c.none+ownedNone;
+    const nv=document.getElementById('nvcounts');
+    if(nv) nv.innerHTML=`<b>${undecided}</b> undecided / ${total}<br>`+
+      `add <b>${c.add}</b> · disc <b>${c.discuss}</b> · rej <b>${c.reject}</b> · coll <b>${coll}</b>`;
+    const nb=document.getElementById('nvnext');
+    if(nb) nb.disabled = undecided===0;
+  }
+  // U1: scroll to the next undecided paper AFTER the current scroll position, in the on-screen order
+  // (respects sort + skips filtered/hidden rows). Wraps to the top if none below. Flashes the target.
+  function jumpNextUndecided(){
+    const vis=papers().filter(p=>!p.classList.contains('filtered') && p.offsetParent!==null
+                                 && (p.dataset.decision||'none')==='none');
+    if(!vis.length) return;
+    const y=window.scrollY, mid=window.innerHeight*0.25;
+    let target=vis.find(p=>p.getBoundingClientRect().top>mid) || vis[0]; // first below fold, else wrap
+    target.scrollIntoView({behavior:'smooth', block:'center'});
+    target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
+  }
+  function toggleNav(){
+    const w=document.getElementById('navwidget'); const c=w.classList.toggle('collapsed');
+    document.getElementById('nvcollapse').textContent = c ? '+' : '–';
   }
   function collectDecisions(){
     const decisions=[];
     papers().forEach(p=>{
-      if(p.closest('.known'))return;
+      const owned=p.dataset.owned==='1';
       const note=p.querySelector('.note');
       const d=p.dataset.decision||'none';
-      if(d!=='none')decisions.push({decision:d, doi:p.dataset.doi||'', title:(p.querySelector('.ptitle')||{}).textContent||'', note:note?note.value.trim():''});
+      if(d==='none')return;
+      decisions.push({decision:d, owned:owned, doi:p.dataset.doi||'', cid:p.dataset.cid||'',
+        zkey:p.dataset.zkey||'', title:(p.querySelector('.ptitle')||{}).textContent||'',
+        note:note?note.value.trim():''});
     });
     return {review:document.title.replace(/^lit-review · /,''), saved:new Date().toISOString(), decisions};
   }
@@ -218,54 +388,84 @@
     download(json,'decisions-copy.json'); msg('⬇ Downloaded decisions-copy.json.','warn');
   }
   // ---- on-the-fly sorting of the ranked (New) list ----
-  function simOf(p){return parseFloat(p.dataset.sim||-1);}
+  // "Relevance" = rank_score (cosine + small cite/recency blend) when present, else pure sim.
+  function simOf(p){var r=parseFloat(p.dataset.rankScore); if(!isNaN(r)&&r!==-1)return r; return parseFloat(p.dataset.sim||-1);}
   function citOf(p){return parseInt(p.dataset.cited||-1);}
-  function reorder(arr){const list=document.getElementById('newlist');arr.forEach(p=>list.appendChild(p));}
+  function curOf(p){return p.dataset.curated==='1';}
+  function discOf(p){return p.dataset.discovery==='1';}
+  let groupMode='curated';            // 'curated' (curated block first), 'mix' (no grouping), 'discovery' (cross-domain only)
+  let lastSort=()=>{};                // remembers the active sort so the grouping toggle can re-apply it
+  // Owned rows are now MERGED into #newlist, so there is a single ranked list to re-sort/group.
+  // Owned and new rows sort together by relevance/citations/mix — fully uniform.
+  const SORT_LISTS=['newlist'];
+  function reorderList(listId, arr){ // arr = this list's rows, already sorted by active key
+    let out=arr;
+    if(groupMode==='curated'){ out=arr.filter(curOf).concat(arr.filter(p=>!curOf(p))); }
+    const list=document.getElementById(listId);
+    // discovery grouping = cross-domain only; owned/non-cross-domain rows are hidden while active.
+    arr.forEach(p=>{ p.style.display=(groupMode==='discovery' && !discOf(p))?'none':''; });
+    out.forEach(p=>list.appendChild(p));
+  }
+  function setGroup(mode,btn){
+    groupMode=mode;
+    [['curated','grpcur'],['mix','grpmix'],['discovery','grpdisc']].forEach(function(x){
+      document.getElementById(x[1]).classList.toggle('sel',mode===x[0]);
+    });
+    lastSort();                        // re-run current sort with new grouping
+  }
   function rankNorm(items,key){ // 0..1 normalized rank by key (higher key → higher norm)
     const vals=[...items].sort((a,b)=>key(b)-key(a)); const m=new Map();
     vals.forEach((p,i)=>m.set(p, vals.length>1?1-i/(vals.length-1):1)); return m;
   }
   const MIX_SIM=0.6, MIX_CIT=0.4; // blend weights for Mix
   function setSortSel(btn){document.querySelectorAll('.sortbtn').forEach(b=>b.classList.remove('sel'));if(btn)btn.classList.add('sel');}
-  function sortInfo(text){ // inline info line (same slot as custom panel); '' hides it
+  function sortInfo(text){ // inline info; '' hides it
     const el=document.getElementById('sortinfo');
-    el.textContent=text||''; el.style.display=text?'block':'none';
+    el.textContent=text||''; el.style.display=text?'inline':'none';
   }
   function showCustom(btn){
     setSortSel(btn); sortInfo('');                       // hide the mix info line
-    document.getElementById('customsort').style.display='flex';
+    document.getElementById('customsort').style.display='inline';
   }
   function applySort(mode,btn){
     setSortSel(btn);
+    lastSort=()=>applySort(mode,btn);
     document.getElementById('customsort').style.display='none';  // presets hide the custom panel
-    const items=[...document.querySelectorAll('#newlist .paper')];
-    if(mode==='similarity'){ items.sort((a,b)=>simOf(b)-simOf(a)); sortInfo(''); }
-    else if(mode==='citations'){ items.sort((a,b)=>citOf(b)-citOf(a)); sortInfo(''); }
-    else{ // mix: blend normalized similarity + normalized citations
-      const ns=rankNorm(items,simOf), nc=rankNorm(items,citOf);
-      items.sort((a,b)=>(MIX_SIM*ns.get(b)+MIX_CIT*nc.get(b))-(MIX_SIM*ns.get(a)+MIX_CIT*nc.get(a)));
-      sortInfo(`Mix = ${Math.round(MIX_SIM*100)}% relevance + ${Math.round(MIX_CIT*100)}% citations (rank-normalized).`);
-    }
-    reorder(items);
+    SORT_LISTS.forEach(listId=>{
+      const items=[...document.querySelectorAll('#'+listId+' .paper')];
+      if(!items.length) return;
+      if(mode==='similarity'){ items.sort((a,b)=>simOf(b)-simOf(a)); }
+      else if(mode==='citations'){ items.sort((a,b)=>citOf(b)-citOf(a)); }
+      else{ // mix: blend normalized similarity + normalized citations (normalized within this list)
+        const ns=rankNorm(items,simOf), nc=rankNorm(items,citOf);
+        items.sort((a,b)=>(MIX_SIM*ns.get(b)+MIX_CIT*nc.get(b))-(MIX_SIM*ns.get(a)+MIX_CIT*nc.get(a)));
+      }
+      reorderList(listId, items);
+    });
+    sortInfo(mode==='mix'?`Mix = ${Math.round(MIX_SIM*100)}% relevance + ${Math.round(MIX_CIT*100)}% citations (rank-normalized, per list).`:'');
   }
   function applyCustom(){
     setSortSel(document.querySelector('.sortbtn[data-sort=custom]'));
-    sortInfo('');
+    lastSort=applyCustom;
     const N=Math.max(1,parseInt(document.getElementById('topN').value)||100);
     const prim=document.getElementById('primary').value, sec=document.getElementById('secondary').value;
     const keyf=k=>k==='citations'?citOf:simOf;
-    let items=[...document.querySelectorAll('#newlist .paper')];
-    // take top N by primary, then sort those by secondary; the rest keep after, sorted by secondary too
-    items.sort((a,b)=>keyf(prim)(b)-keyf(prim)(a));
-    const top=items.slice(0,N).sort((a,b)=>keyf(sec)(b)-keyf(sec)(a));
-    const rest=items.slice(N).sort((a,b)=>keyf(sec)(b)-keyf(sec)(a));
-    reorder(top.concat(rest));
-    sortInfo(`Custom: top ${N} by ${prim}, then sorted by ${sec}.`);
+    SORT_LISTS.forEach(listId=>{
+      let items=[...document.querySelectorAll('#'+listId+' .paper')];
+      if(!items.length) return;
+      items.sort((a,b)=>keyf(prim)(b)-keyf(prim)(a));
+      const top=items.slice(0,N).sort((a,b)=>keyf(sec)(b)-keyf(sec)(a));
+      const rest=items.slice(N).sort((a,b)=>keyf(sec)(b)-keyf(sec)(a));
+      reorderList(listId, top.concat(rest));
+    });
+    sortInfo(`Custom: top ${N} by ${prim}, then sorted by ${sec} (per list).`);
   }
   // Restore selection styling from data-decision on load (for re-opened / re-generated files).
   papers().forEach(p=>{const d=p.dataset.decision;if(d)p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===d));
     const n=p.querySelector('.note');if(n&&p.dataset.note)n.value=p.dataset.note;});
   updateCounts();
+  // Initial paint: apply default sort (Relevance) with curated-first grouping so the ⭐ block leads.
+  applySort('similarity', document.querySelector('.sortbtn[data-sort=similarity]'));
   // autosave note edits too (debounced via queueSave)
   papers().forEach(p=>{const n=p.querySelector('.note'); if(n) n.addEventListener('input', queueSave);});
   // Save buttons only shown when NOT served (file:// fallback); served = silent autosave.
@@ -282,11 +482,12 @@
         const r=await fetch('decisions.json',{cache:'no-store'});
         if(r.ok){
           const data=await r.json();
-          const byDoi={};
-          (data.decisions||[]).forEach(d=>{ if(d.doi) byDoi[d.doi]=d; });
+          // Key by DOI (preferred) AND by cid (candidate id) so no-DOI decisions restore too (P4d).
+          const byDoi={}, byCid={};
+          (data.decisions||[]).forEach(d=>{ if(d.doi) byDoi[d.doi]=d; if(d.cid) byCid[d.cid]=d; });
           let n=0;
           papers().forEach(p=>{
-            const d=byDoi[p.dataset.doi]; if(!d) return;
+            const d=(p.dataset.doi&&byDoi[p.dataset.doi]) || byCid[p.dataset.cid]; if(!d) return;
             p.dataset.decision=d.decision;
             p.querySelectorAll('.choice button').forEach(b=>b.classList.toggle('sel',b.dataset.c===d.decision));
             const note=p.querySelector('.note'); if(note&&d.note) note.value=d.note;
@@ -299,6 +500,21 @@
     }
     priorLoaded=true;  // enable autosave only AFTER restore, so loading doesn't overwrite with empty
   }
+  // Stacked sticky bars: measure header + filterbar heights so filterbar sits below the header and
+  // sortbar2 below the filterbar (they no longer pile up at top:0 and overlap when scrolled).
+  function updateStickyOffsets(){
+    const hdr=document.querySelector('header'), flt=document.getElementById('filterbar');
+    const hh=hdr?hdr.getBoundingClientRect().height:0;
+    const fh=flt?flt.getBoundingClientRect().height:0;
+    const root=document.documentElement.style;
+    root.setProperty('--hdr-h', Math.round(hh)+'px');
+    root.setProperty('--flt-h', Math.round(fh)+'px');
+  }
+  updateStickyOffsets();
+  window.addEventListener('resize', updateStickyOffsets);
+  // Re-measure after fonts/emoji settle (heights can grow slightly on first paint).
+  setTimeout(updateStickyOffsets, 300);
+
   loadPrior();
 </script>
 </body>

@@ -9,8 +9,8 @@ three roles:
    **deliberately rejected, with the reason** (so we don't re-propose it).
 3. **Contract for editors** — see the rule below.
 
-> **RULE FOR ANY AGENT EDITING THIS SKILL.** Whenever you change anything under
-> `~/.claude/skills/lit-review/` (scripts, SKILL.md, templates, reference), you MUST update
+> **RULE FOR ANY AGENT EDITING THIS SKILL.** Whenever you change anything in this skill's
+> folder (scripts, SKILL.md, templates, reference), you MUST update
 > this file in the same pass: move the item from **Open backlog** to **Implemented**, or add
 > a new **Implemented**/**Rejected** entry describing what you did and why. An undocumented
 > skill change is an incomplete change. Keep entries short; link to the file/function you

@@ -304,8 +304,10 @@ tickets A2/A3). Give them as an ordered, first-timer-proof sequence, and stress 
 `added-by-claude` tag in the tag selector, or search it, then Ctrl/Cmd-A):
  (1) Right-click → **Find Available PDF** (older Zotero: *Find Full Text*) — fetches the missing PDFs.
      Do this FIRST; Zotero's resolver uses your library proxy and beats any scripted OA fetch (agents
-     get publisher 403s). A few closed-access ones (Science, some Cell/Wiley) may stay PDF-less — grab
-     those via the browser **Zotero Connector** on the article page.
+     get publisher 403s). For the few it can't find (Science, some Cell/Wiley), **add the PDF manually**
+     where possible: download it to your Downloads folder, then select the item → right-click →
+     **ZotMoov: Attach New File** (attaches your last-downloaded file). The browser **Zotero Connector**
+     on the article page also works.
  (2) THEN, with the items still selected, right-click → **Zotmoov: Move selected to Directory** —
      relocates the downloaded PDFs into your local linked-file storage."
 

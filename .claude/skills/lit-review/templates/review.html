@@ -161,7 +161,8 @@
       <li><b>Your choices save automatically</b> to <code>decisions.json</code> in this folder as you go — no button to press. When done, just tell Claude <em>"decisions saved"</em>; it adds the approved papers to Zotero (tags + collection + notes).</li>
       <li>After Claude adds them, get the PDFs — <b>in Zotero desktop</b> (Claude can't do these; they're desktop-only). Select the new items (filter/search the <code>added-by-claude</code> tag → Ctrl/Cmd-A):
         <ol type="a" style="margin:4px 0 0">
-          <li><b>Right-click → Find Available PDF</b> (a.k.a. <i>Find Full Text</i>) — fetches the missing PDFs. Do this <em>first</em>: Zotero's resolver uses your library proxy and beats any automated fetch. A few closed-access ones (Science, some Cell/Wiley) may stay without a PDF — grab those via the browser <b>Zotero Connector</b> on the article page.</li>
+          <li><b>Right-click → Find Available PDF</b> (a.k.a. <i>Find Full Text</i>) — fetches the missing PDFs. Do this <em>first</em>: Zotero's resolver uses your library proxy and beats any automated fetch.
+            <br>For the few it can't find (Science, some Cell/Wiley), <b>add the PDF manually</b> where possible: open the article, download the PDF to your <i>Downloads</i> folder, then in Zotero select the item → <b>right-click → ZotMoov: Attach New File</b> (it attaches your <em>last downloaded</em> file). The browser <b>Zotero Connector</b> on the article page also works.</li>
           <li><b>Then</b>, with the items still selected, <b>right-click → Zotmoov: Move selected to Directory</b> — relocates the downloaded PDFs into your local linked-file storage.</li>
         </ol>
         Order matters: Zotmoov only moves PDFs that already exist, so run <b>Find Available PDF</b> before it.
